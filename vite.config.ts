@@ -18,7 +18,7 @@ function bhashaSetuApiPlugin(): Plugin {
           res.end(JSON.stringify({
             status: 'online',
             hasApiKey: hasKey,
-            model: 'gemini-2.5-flash / gemini-1.5-flash'
+            model: 'gemini-3.8-flash'
           }));
           return;
         }
