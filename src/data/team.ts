@@ -6,28 +6,32 @@ export const TEAM_MEMBERS: TeamMember[] = [
     role: 'Team Lead & Project Coordinator',
     department: 'Data Science',
     linkedinUrl: 'https://www.linkedin.com/in/priyanshu-kumar-sinha-515b82329',
-    initials: 'PS'
+    initials: 'PS',
+    image: '/team/priyanshu.jpg'
   },
   {
     name: 'Rommaan Qamar',
     role: 'Frontend Developer',
     department: 'Data Science',
     linkedinUrl: 'https://www.linkedin.com/in/rommaan-qamar-aba9093a4',
-    initials: 'RQ'
+    initials: 'RQ',
+    image: '/team/rommaan.jpg'
   },
   {
     name: 'Aditya Kumar',
     role: 'AI/ML & Translation Engineer',
     department: 'Data Science',
     linkedinUrl: 'https://www.linkedin.com/in/aditya-kumar-b4b017361',
-    initials: 'AK'
+    initials: 'AK',
+    image: '/team/aditya.jpg'
   },
   {
     name: 'Snehal Kumari',
     role: 'Speech & Voice Module Developer',
     department: 'Data Science',
     linkedinUrl: 'https://www.linkedin.com/in/snehalkumari56',
-    initials: 'SK'
+    initials: 'SK',
+    image: '/team/snehal.jpg'
   },
   {
     name: 'Ishan Saha',
@@ -42,6 +46,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
     department: 'Electronics and Communication Engineering',
     // Do not invent a LinkedIn URL as instructed
     linkedinUrl: undefined,
-    initials: 'SM'
+    initials: 'SM',
+    image: '/team/shayantan.jpg'
   }
 ];

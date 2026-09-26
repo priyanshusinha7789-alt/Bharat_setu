@@ -35,4 +35,5 @@ export interface TeamMember {
   department: string;
   linkedinUrl?: string;
   initials: string;
+  image?: string;
 }

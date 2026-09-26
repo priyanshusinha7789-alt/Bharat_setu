@@ -50,30 +50,47 @@ export const Team: React.FC = () => {
                 height: '100%'
               }}
             >
-              {/* Photo placeholder / Initials Badge - never overlapped by buttons */}
+              {/* Photo / Initials Badge - never overlapped by buttons */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: '16px',
                 marginBottom: '16px'
               }}>
-                <div style={{
-                  width: '56px',
-                  height: '56px',
-                  borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #1e3a8a 0%, #0284c7 100%)',
-                  color: '#ffffff',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.2rem',
-                  fontWeight: 700,
-                  letterSpacing: '0.05em',
-                  boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
-                  flexShrink: 0
-                }}>
-                  {member.initials}
-                </div>
+                {member.image ? (
+                  <img
+                    src={member.image}
+                    alt={member.name}
+                    style={{
+                      width: '60px',
+                      height: '60px',
+                      borderRadius: '14px',
+                      objectFit: 'cover',
+                      objectPosition: 'center top',
+                      border: '2px solid #20314d',
+                      boxShadow: '0 4px 14px rgba(2, 132, 199, 0.25)',
+                      flexShrink: 0
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '60px',
+                    height: '60px',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #1e3a8a 0%, #0284c7 100%)',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '1.25rem',
+                    fontWeight: 700,
+                    letterSpacing: '0.05em',
+                    boxShadow: '0 4px 12px rgba(2, 132, 199, 0.25)',
+                    flexShrink: 0
+                  }}>
+                    {member.initials}
+                  </div>
+                )}
                 <div>
                   <h3 style={{ fontSize: '1.12rem', marginBottom: '4px', color: '#ffffff' }}>
                     {member.name}
