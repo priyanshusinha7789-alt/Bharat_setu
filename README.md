@@ -7,22 +7,39 @@
 
 ---
 
-## 🚀 Live Demo & Key Highlights
+## 🚀 Key Features
 
-- **Pedagogical Classroom Console:** English speech input (`en-IN`) translated into regional and indigenous mother tongues.
-- **6 Target Languages:** Hindi, Bengali, Santali, Mundari, Ho, and Kurukh.
-- **Ethical AI & Linguistic Integrity:** 
-  - Verified offline entries for Hindi and Bengali.
-  - Transparent *“Sample translation requires validation by a fluent speaker”* status for tribal languages to avoid machine hallucination in primary classrooms.
-- **Zero Paid Dependencies:** Uses client-side Web Speech API (`SpeechRecognition`) and Speech Synthesis (`SpeechSynthesisUtterance`). No API keys, no backend servers, no cloud costs.
-- **Curricular Sentence Verification:** Includes 3 verified foundational primary science and math sentences.
+- **Real Google Gemini AI Translation:** Live context-aware translation of arbitrary English, Hindi, Marathi, Hinglish, mixed classroom dialects, and slang into Jharkhand vernaculars (Hindi, Bengali, Santali, Mundari, Ho, Kurukh).
+- **Pedagogical Child-Centric Prompting:** Formulates explanations tailored for primary school comprehension (Grades 1 to 5) rather than stiff literal translations.
+- **Multilingual Speech Recognition:** Live microphone input supporting Indian English (`en-IN`), Hindi (`hi-IN`), Marathi (`mr-IN`), Bengali (`bn-IN`), and mixed classroom speech.
+- **Speech-to-Speech Flow:** Microphone Speech Recognition → Gemini AI Translation → Translated Text Display & Phonetic Guide → Web Speech Text-to-Speech Audio Playback.
+- **Secure Backend API:** API keys are managed exclusively on the server side (`process.env.GEMINI_API_KEY`) via backend endpoints (`/api/translate`, `/api/status`) and are never exposed in client bundle code.
+- **Ethical Integrity & Graceful Validation:** Includes sample prompts for instant testing and clear status reporting if an API key is not yet configured.
+
+---
+
+## 🔑 Gemini API Key Configuration
+
+To enable real-time AI translation for arbitrary sentences and tribal languages:
+
+1. **Get a free Gemini API key:**
+   Visit **[Google AI Studio](https://aistudio.google.com/app/apikey)** and click **Create API Key**.
+
+2. **Add to `.env`:**
+   Open the `.env` file in the project root (`C:\Users\HP\.gemini\antigravity\scratch\bhasha-setu\.env`) and add your key:
+   ```env
+   GEMINI_API_KEY=AIzaSy...your_actual_api_key_here
+   ```
+
+3. **Restart the server (if already running):**
+   ```bash
+   npm run dev
+   ```
+   The console will automatically detect your key and switch to live AI translation mode.
 
 ---
 
 ## 💻 Local Setup & Execution
-
-### Prerequisites
-- Node.js (v18.0.0 or higher) and npm installed.
 
 ### 1. Install Dependencies
 ```bash
@@ -33,53 +50,30 @@ npm install
 ```bash
 npm run dev
 ```
-Open your browser at `http://localhost:5173`.
+Open **`http://localhost:5173`** in Google Chrome or Microsoft Edge.
 
-### 3. Production Build & Preview
+### 3. Run Automated Test Suite
+```bash
+npm test
+```
+Verifies languages, sample data, team cards, API error handling, and Gemini service logic.
+
+### 4. Run Production Build & Server
 ```bash
 npm run build
-npm run preview
+node server.mjs
 ```
 
 ---
 
-## ⚡ Shortest GitHub & Vercel Deployment Steps
+## ⚡ Deployment Instructions
 
-### Option A: 1-Click Vercel CLI (Fastest)
-1. In the project directory, run:
-   ```bash
-   npx vercel
-   ```
-2. Accept the defaults (`Framework: Vite`, `Build Command: npm run build`, `Output Directory: dist`).
-3. Your live HTTPS URL will be generated in under 60 seconds.
-
-### Option B: GitHub + Vercel Dashboard
-1. Initialize git and commit:
-   ```bash
-   git init
-   git add .
-   git commit -m "Initial commit: Bhasha Setu prototype"
-   git branch -M main
-   git remote add origin https://github.com/<your-username>/bhasha-setu.git
-   git push -u origin main
-   ```
-2. Open [vercel.com](https://vercel.com) and click **"Add New Project"**.
-3. Import the `bhasha-setu` repository.
-4. Leave framework preset as **Vite** and click **Deploy**.
-
----
-
-## ⚠️ Browser & Language Limitations Checklist
-
-1. **Microphone (Web Speech Recognition):**
-   - **Chrome / Edge / Chromium Browsers:** Fully supported natively over HTTPS or `localhost`.
-   - **Firefox / Safari:** The native `SpeechRecognition` API is either behind experimental flags or restricted. If unsupported, BHASHA SETU gracefully switches to fallback mode with verified sample sentence buttons.
-   - **Permission Requirement:** Microphone access must be allowed in the browser prompt.
-2. **Text-to-Speech (Web Speech Synthesis):**
-   - **Hindi (`hi-IN`) & Bengali (`bn-IN`):** Voices are pre-installed on most modern Windows, Android, and macOS systems.
-   - **Tribal Languages (Santali, Mundari, Ho, Kurukh):** Mainstream operating systems do not yet provide pre-installed neural TTS voice packs for these indigenous languages. The prototype flags this notice gracefully and plays a phonetic fallback when triggered.
-3. **Offline In-Memory Dictionary Scope:**
-   - The current prototype operates entirely on an in-memory curricular dictionary. Arbitrary spoken sentences outside the foundational samples will explicitly indicate that offline sample translations are not yet cached, preserving academic integrity rather than returning unverified outputs.
+### Vercel / Cloud Deployment
+1. Set the Environment Variable in your deployment dashboard:
+   - **Key:** `GEMINI_API_KEY`
+   - **Value:** Your Gemini API key from Google AI Studio.
+2. Build command: `npm run build`
+3. Output directory: `dist`
 
 ---
 

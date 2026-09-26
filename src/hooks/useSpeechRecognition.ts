@@ -11,6 +11,11 @@ export function useSpeechRecognition(onResultCallback?: (text: string) => void) 
   const [isSupported, setIsSupported] = useState(true);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
+  const callbackRef = useRef(onResultCallback);
+
+  useEffect(() => {
+    callbackRef.current = onResultCallback;
+  }, [onResultCallback]);
 
   useEffect(() => {
     const win = window as unknown as IWindow;
@@ -25,7 +30,7 @@ export function useSpeechRecognition(onResultCallback?: (text: string) => void) 
       const recognition = new SpeechRecognitionAPI();
       recognition.continuous = false;
       recognition.interimResults = false;
-      recognition.lang = 'en-IN'; // As specified: en-IN
+      recognition.lang = 'en-IN'; // default
 
       recognition.onstart = () => {
         setIsListening(true);
@@ -34,10 +39,8 @@ export function useSpeechRecognition(onResultCallback?: (text: string) => void) 
 
       recognition.onresult = (event: any) => {
         const transcript = event.results[0]?.[0]?.transcript || '';
-        if (transcript) {
-          if (onResultCallback) {
-            onResultCallback(transcript);
-          }
+        if (transcript && callbackRef.current) {
+          callbackRef.current(transcript);
         }
       };
 
@@ -45,13 +48,15 @@ export function useSpeechRecognition(onResultCallback?: (text: string) => void) 
         setIsListening(false);
         let message = 'Speech recognition error occurred.';
         if (event.error === 'not-allowed') {
-          message = 'Microphone access denied. Please grant microphone permission in your browser settings.';
+          message = 'Microphone access denied. Please allow microphone permissions in your browser address bar.';
         } else if (event.error === 'no-speech') {
-          message = 'No speech was detected. Please try speaking closer to your microphone or click a sample card.';
+          message = 'No speech detected. Please speak closer to your microphone or check microphone volume.';
+        } else if (event.error === 'audio-capture') {
+          message = 'No microphone device was found. Please ensure a microphone is connected.';
         } else if (event.error === 'network') {
-          message = 'Network error during voice recognition. Please check connection or use the sample cards.';
+          message = 'Network error during voice recognition. Browser speech service requires an active internet connection.';
         } else {
-          message = `Voice error: ${event.error || 'recognition interrupted'}. Please try again or use sample cards.`;
+          message = `Voice input error (${event.error || 'unknown'}). Please try again or type in the box.`;
         }
         setErrorMessage(message);
       };
@@ -61,7 +66,7 @@ export function useSpeechRecognition(onResultCallback?: (text: string) => void) 
       };
 
       recognitionRef.current = recognition;
-    } catch (e) {
+    } catch {
       setIsSupported(false);
       setErrorMessage('Speech recognition initialization failed in this browser environment.');
     }
@@ -75,24 +80,32 @@ export function useSpeechRecognition(onResultCallback?: (text: string) => void) 
         }
       }
     };
-  }, [onResultCallback]);
+  }, []);
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback((langCode: string = 'en-IN') => {
     setErrorMessage(null);
     if (!isSupported) {
-      setErrorMessage('Voice recognition is not supported in this browser. Please use Chrome, Edge, or select a sample card.');
+      setErrorMessage('Voice recognition is not supported in this browser. Please use Chrome, Edge, or enter text manually.');
       return;
     }
     if (recognitionRef.current) {
       try {
+        recognitionRef.current.lang = langCode;
         recognitionRef.current.start();
-      } catch (err: any) {
+      } catch {
         // If already started, restart
         try {
           recognitionRef.current.stop();
-          setTimeout(() => recognitionRef.current?.start(), 100);
+          setTimeout(() => {
+            try {
+              recognitionRef.current.lang = langCode;
+              recognitionRef.current?.start();
+            } catch {
+              // Ignore
+            }
+          }, 100);
         } catch {
-          setErrorMessage('Could not restart microphone. Please try again or click a sample card.');
+          setErrorMessage('Could not restart microphone. Please try again.');
         }
       }
     }

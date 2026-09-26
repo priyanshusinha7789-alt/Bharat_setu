@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useId } from 'react';
+import React, { useState, useEffect, useId, useCallback } from 'react';
 import { LanguageId } from '../types';
 import { LANGUAGES } from '../data/languages';
-import { SAMPLE_SENTENCES, findTranslation } from '../data/translations';
+import { SAMPLE_SENTENCES } from '../data/translations';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { useSpeechSynthesis } from '../hooks/useSpeechSynthesis';
+import { useGeminiTranslation } from '../hooks/useGeminiTranslation';
 import {
   MicIcon,
   MicOffIcon,
@@ -18,17 +19,56 @@ import {
   ExternalLinkIcon
 } from './Icons';
 
+const SOURCE_LANGUAGES = [
+  { code: 'en-IN', label: 'English (India / Hinglish)' },
+  { code: 'hi-IN', label: 'Hindi (हिन्दी)' },
+  { code: 'mr-IN', label: 'Marathi (मराठी)' },
+  { code: 'bn-IN', label: 'Bengali (বাংলা)' },
+  { code: 'auto', label: 'Multilingual / Mixed Speech' }
+];
+
 export const ClassroomConsole: React.FC = () => {
   const teacherInputId = useId();
   const targetLanguageId = useId();
+  const sourceLanguageId = useId();
 
   // State
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageId>('hindi');
+  const [selectedSourceLang, setSelectedSourceLang] = useState<string>('en-IN');
   const [inputText, setInputText] = useState<string>(SAMPLE_SENTENCES[0].english);
   const [activeSampleId, setActiveSampleId] = useState<number | null>(1);
   const [copied, setCopied] = useState<boolean>(false);
+  const [serverStatus, setServerStatus] = useState<{ hasApiKey: boolean; status: string } | null>(null);
+
+  // Gemini AI Translation Hook
+  const {
+    translate: translateWithAi,
+    isLoading: isTranslating,
+    result: aiResult,
+    errorMessage: aiError,
+    errorCode: aiErrorCode,
+    clearTranslation
+  } = useGeminiTranslation();
 
   // Custom hooks
+  const {
+    speak,
+    stop: stopAudio,
+    isSpeaking,
+    ttsNotice,
+    clearNotice: clearTtsNotice
+  } = useSpeechSynthesis();
+
+  // Trigger AI translation callback
+  const executeTranslation = useCallback(
+    (text: string, targetLang: LanguageId, sourceHint: string) => {
+      stopAudio();
+      translateWithAi(text, targetLang, sourceHint);
+    },
+    [stopAudio, translateWithAi]
+  );
+
+  // Multilingual Speech Recognition
   const {
     isListening,
     isSupported: isMicSupported,
@@ -38,24 +78,29 @@ export const ClassroomConsole: React.FC = () => {
     clearError: clearMicError
   } = useSpeechRecognition((transcript) => {
     setInputText(transcript);
-    // When spoken text arrives, check if it matches one of our samples
-    const match = SAMPLE_SENTENCES.find(
-      s => s.english.toLowerCase().trim() === transcript.toLowerCase().trim()
-    );
-    setActiveSampleId(match ? match.id : null);
+    setActiveSampleId(null);
+    clearMicError();
+    clearTtsNotice();
+    // Connect Speech Recognition -> Translation immediately
+    executeTranslation(transcript, selectedLanguage, selectedSourceLang);
   });
 
-  const {
-    speak,
-    stop: stopAudio,
-    isSpeaking,
-    ttsNotice,
-    clearNotice: clearTtsNotice
-  } = useSpeechSynthesis();
+  // Check server API status on mount
+  useEffect(() => {
+    fetch('/api/status')
+      .then((res) => res.json())
+      .then((data) => setServerStatus(data))
+      .catch(() => setServerStatus({ hasApiKey: false, status: 'offline' }));
+  }, []);
 
-  // Translation result computation
-  const translationResult = findTranslation(inputText, selectedLanguage);
-  const currentLangMeta = LANGUAGES.find(l => l.id === selectedLanguage)!;
+  // Initial translation of sample 1 on load
+  useEffect(() => {
+    if (SAMPLE_SENTENCES[0]?.english) {
+      executeTranslation(SAMPLE_SENTENCES[0].english, selectedLanguage, selectedSourceLang);
+    }
+  }, []); // Run once on mount
+
+  const currentLangMeta = LANGUAGES.find((l) => l.id === selectedLanguage)!;
 
   // Handle sample click
   const handleSelectSample = (sentence: typeof SAMPLE_SENTENCES[0]) => {
@@ -64,6 +109,7 @@ export const ClassroomConsole: React.FC = () => {
     setActiveSampleId(sentence.id);
     clearMicError();
     clearTtsNotice();
+    executeTranslation(sentence.english, selectedLanguage, selectedSourceLang);
   };
 
   // Handle language change
@@ -71,6 +117,14 @@ export const ClassroomConsole: React.FC = () => {
     stopAudio();
     setSelectedLanguage(newLang);
     clearTtsNotice();
+    if (inputText.trim()) {
+      executeTranslation(inputText, newLang, selectedSourceLang);
+    }
+  };
+
+  // Handle source speech language change
+  const handleSourceLangChange = (newSource: string) => {
+    setSelectedSourceLang(newSource);
   };
 
   // Handle text input change
@@ -78,7 +132,7 @@ export const ClassroomConsole: React.FC = () => {
     const val = e.target.value;
     setInputText(val);
     const match = SAMPLE_SENTENCES.find(
-      s => s.english.toLowerCase().trim() === val.toLowerCase().trim()
+      (s) => s.english.toLowerCase().trim() === val.toLowerCase().trim()
     );
     setActiveSampleId(match ? match.id : null);
     clearMicError();
@@ -91,23 +145,32 @@ export const ClassroomConsole: React.FC = () => {
       stopListening();
     } else {
       stopAudio();
-      startListening();
+      // Pass selected language to speech recognition engine
+      const micLangCode = selectedSourceLang === 'auto' ? 'en-IN' : selectedSourceLang;
+      startListening(micLangCode);
     }
+  };
+
+  // Manual trigger for typed translation
+  const handleManualTranslate = () => {
+    if (!inputText.trim()) return;
+    executeTranslation(inputText, selectedLanguage, selectedSourceLang);
   };
 
   // Text-to-speech Play handler
   const handlePlayAudio = () => {
-    if (!translationResult.translationText) return;
-    if (translationResult.status === 'no_sample') return;
+    const textToSpeak = aiResult?.translation;
+    if (!textToSpeak) return;
 
     const voiceCode = currentLangMeta.ttsVoiceCode || 'hi-IN';
-    speak(translationResult.translationText, voiceCode, currentLangMeta.name);
+    speak(textToSpeak, voiceCode, currentLangMeta.name);
   };
 
   // Copy to clipboard
   const handleCopy = () => {
-    if (!translationResult.translationText) return;
-    navigator.clipboard.writeText(translationResult.translationText).then(() => {
+    const textToCopy = aiResult?.translation;
+    if (!textToCopy) return;
+    navigator.clipboard.writeText(textToCopy).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -117,6 +180,7 @@ export const ClassroomConsole: React.FC = () => {
   const handleReset = () => {
     stopAudio();
     stopListening();
+    clearTranslation();
     setInputText('');
     setActiveSampleId(null);
     clearMicError();
@@ -142,7 +206,7 @@ export const ClassroomConsole: React.FC = () => {
       <div className="container-custom">
         
         {/* Section Header */}
-        <div style={{ textAlign: 'center', maxWidth: '780px', margin: '0 auto 2.5rem' }}>
+        <div style={{ textAlign: 'center', maxWidth: '820px', margin: '0 auto 2.5rem' }}>
           <div style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -154,15 +218,34 @@ export const ClassroomConsole: React.FC = () => {
             letterSpacing: '0.08em',
             marginBottom: '0.5rem'
           }}>
-            <SparklesIcon size={16} /> Interactive Classroom Console
+            <SparklesIcon size={16} /> AI-Powered Vernacular Classroom Console
           </div>
           <h2 style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', marginBottom: '0.75rem' }}>
             Live Mother Tongue Translation Demo
           </h2>
           <p style={{ color: '#94a3b8', fontSize: '0.98rem', lineHeight: 1.6 }}>
-            Demonstrating classroom speech-to-vernacular translation flow. Click any curricular sample sentence below or use the microphone to test live speech recognition in Indian English (<code style={{ color: '#38bdf8' }}>en-IN</code>).
+            Powered by Google Gemini AI for contextual translation of arbitrary English, Hindi, Marathi, Hinglish, and classroom speech into Jharkhand vernaculars (Hindi, Bengali, Santali, Mundari, Ho, Kurukh).
           </p>
         </div>
+
+        {/* Server Status Badge / API Key Notice */}
+        {serverStatus && !serverStatus.hasApiKey && (
+          <div style={{
+            backgroundColor: 'rgba(234, 179, 8, 0.1)',
+            border: '1px solid #ca8a04',
+            borderRadius: '12px',
+            padding: '14px 18px',
+            marginBottom: '2rem',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '12px'
+          }}>
+            <AlertCircleIcon size={22} style={{ color: '#facc15', flexShrink: 0, marginTop: '2px' }} />
+            <div style={{ fontSize: '0.86rem', color: '#fef08a', lineHeight: 1.5 }}>
+              <strong>Gemini API Key Setup Required:</strong> To enable real-time AI translation for arbitrary sentences and tribal languages, add your <code style={{ backgroundColor: '#1e293b', padding: '2px 6px', borderRadius: '4px', color: '#38bdf8' }}>GEMINI_API_KEY</code> in the <code style={{ backgroundColor: '#1e293b', padding: '2px 6px', borderRadius: '4px', color: '#38bdf8' }}>.env</code> file. Get a free API key at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8', fontWeight: 600, textDecoration: 'underline' }}>Google AI Studio</a>.
+            </div>
+          </div>
+        )}
 
         {/* 3 Clickable Sample Sentence Cards */}
         <div style={{ marginBottom: '2rem' }}>
@@ -173,10 +256,10 @@ export const ClassroomConsole: React.FC = () => {
             marginBottom: '0.75rem'
           }}>
             <span style={{ fontSize: '0.88rem', fontWeight: 600, color: '#cbd5e1' }}>
-              Select a Primary Curriculum Lesson Sample:
+              Select a Primary Curriculum Lesson Prompt:
             </span>
             <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-              Click to load instantly
+              Click to translate dynamically via Gemini AI
             </span>
           </div>
 
@@ -248,7 +331,7 @@ export const ClassroomConsole: React.FC = () => {
                     color: isSelected ? '#38bdf8' : '#64748b',
                     fontWeight: 600
                   }}>
-                    {isSelected ? '✓ Currently Loaded in Console' : 'Click to test in vernacular →'}
+                    {isSelected ? '✓ Loaded & Sent to Gemini AI' : 'Click to translate with AI →'}
                   </div>
                 </button>
               );
@@ -272,39 +355,54 @@ export const ClassroomConsole: React.FC = () => {
             justifyContent: 'space-between'
           }}>
             <div>
-              {/* Header with Source Lang and Mic Button */}
+              {/* Header with Source Lang Selector and Mic Button */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '12px',
                 marginBottom: '14px'
               }}>
                 <div>
-                  <div style={{
+                  <label htmlFor={sourceLanguageId} style={{
                     fontSize: '0.74rem',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
                     color: '#94a3b8',
-                    fontWeight: 600
+                    fontWeight: 600,
+                    display: 'block'
                   }}>
-                    Source Language (Teacher)
-                  </div>
-                  <div style={{
-                    fontSize: '1.1rem',
-                    fontWeight: 700,
-                    color: '#ffffff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}>
-                    English <span style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: 500 }}>(India, en-IN)</span>
-                  </div>
+                    Source Speech / Input Language
+                  </label>
+                  <select
+                    id={sourceLanguageId}
+                    value={selectedSourceLang}
+                    onChange={(e) => handleSourceLangChange(e.target.value)}
+                    style={{
+                      backgroundColor: '#141e33',
+                      color: '#ffffff',
+                      border: '1px solid #20314d',
+                      borderRadius: '8px',
+                      padding: '6px 12px',
+                      fontSize: '0.88rem',
+                      fontWeight: 600,
+                      marginTop: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {SOURCE_LANGUAGES.map((sl) => (
+                      <option key={sl.code} value={sl.code} style={{ backgroundColor: '#0f172a', color: '#fff' }}>
+                        {sl.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Microphone Toggle Button */}
                 <button
                   onClick={toggleListening}
-                  aria-label={isListening ? 'Stop listening to teacher speech' : 'Start listening to teacher speech'}
+                  aria-label={isListening ? 'Stop listening to speech' : 'Start microphone speech recognition'}
                   title={isListening ? 'Click to stop listening' : 'Click to speak using microphone'}
                   className={isListening ? 'animate-pulse-mic' : ''}
                   style={{
@@ -319,7 +417,8 @@ export const ClassroomConsole: React.FC = () => {
                     fontWeight: 600,
                     fontSize: '0.85rem',
                     cursor: 'pointer',
-                    transition: 'all 0.2s ease'
+                    transition: 'all 0.2s ease',
+                    marginTop: 'auto'
                   }}
                 >
                   {isListening ? (
@@ -372,7 +471,7 @@ export const ClassroomConsole: React.FC = () => {
                             cursor: 'pointer'
                           }}
                         >
-                          Use Verified Sample 1 Fallback
+                          Use Curriculum Sample Fallback
                         </button>
                       </div>
                     </div>
@@ -404,7 +503,7 @@ export const ClassroomConsole: React.FC = () => {
                   fontSize: '0.8rem',
                   color: '#fde68a'
                 }}>
-                  Browser Web Speech API is not enabled in this environment. Please click one of the 3 verified sample cards above.
+                  Browser Web Speech API is restricted in this environment. Type any sentence below or use Chrome/Edge on localhost/HTTPS.
                 </div>
               )}
 
@@ -416,14 +515,14 @@ export const ClassroomConsole: React.FC = () => {
                 marginBottom: '6px',
                 fontWeight: 500
               }}>
-                Teacher's lesson explanation (type or speak):
+                Teacher's lesson explanation (English, Hindi, Marathi, Hinglish, slang):
               </label>
               <textarea
                 id={teacherInputId}
                 rows={4}
                 value={inputText}
                 onChange={handleInputChange}
-                placeholder="Type lesson explanation or click a sample card above..."
+                placeholder="Type or speak any classroom explanation (e.g. 'Plants use photosynthesis to make food', or 'Triangle la teen sides astat')..."
                 style={{
                   width: '100%',
                   backgroundColor: '#0a0f1d',
@@ -437,6 +536,31 @@ export const ClassroomConsole: React.FC = () => {
                   minHeight: '110px'
                 }}
               />
+
+              {/* Translate Action Button */}
+              <div style={{ marginTop: '10px' }}>
+                <button
+                  onClick={handleManualTranslate}
+                  disabled={isTranslating || !inputText.trim()}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    backgroundColor: isTranslating || !inputText.trim() ? '#1e293b' : '#38bdf8',
+                    color: isTranslating || !inputText.trim() ? '#64748b' : '#0a0f1d',
+                    border: 'none',
+                    padding: '8px 16px',
+                    borderRadius: '8px',
+                    fontWeight: 700,
+                    fontSize: '0.88rem',
+                    cursor: isTranslating || !inputText.trim() ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <SparklesIcon size={16} />
+                  <span>{isTranslating ? 'Translating with Gemini...' : 'Translate with Gemini AI'}</span>
+                </button>
+              </div>
             </div>
 
             {/* Input Controls Footer */}
@@ -449,7 +573,7 @@ export const ClassroomConsole: React.FC = () => {
               borderTop: '1px solid #1e293b'
             }}>
               <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                {inputText.length} characters • {activeSampleId ? `Sample #${activeSampleId} active` : 'Manual input'}
+                {inputText.length} characters • {activeSampleId ? `Curriculum Sample #${activeSampleId}` : 'Arbitrary input'}
               </span>
               <button
                 onClick={handleReset}
@@ -518,7 +642,7 @@ export const ClassroomConsole: React.FC = () => {
                   >
                     {LANGUAGES.map((lang) => (
                       <option key={lang.id} value={lang.id} style={{ backgroundColor: '#0f172a', color: '#fff' }}>
-                        {lang.name} ({lang.nativeName}) {lang.status === 'verified' ? '✓' : '⚠️'}
+                        {lang.name} ({lang.nativeName})
                       </option>
                     ))}
                   </select>
@@ -534,18 +658,11 @@ export const ClassroomConsole: React.FC = () => {
                     fontWeight: 600,
                     padding: '4px 10px',
                     borderRadius: '999px',
-                    backgroundColor: currentLangMeta.status === 'verified'
-                      ? 'rgba(52, 211, 153, 0.15)'
-                      : 'rgba(253, 224, 71, 0.15)',
-                    color: currentLangMeta.status === 'verified' ? '#34d399' : '#fde047',
-                    border: `1px solid ${currentLangMeta.status === 'verified' ? '#059669' : '#ca8a04'}`
+                    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                    color: '#38bdf8',
+                    border: '1px solid #0284c7'
                   }}>
-                    {currentLangMeta.status === 'verified' ? (
-                      <CheckCircleIcon size={14} />
-                    ) : (
-                      <AlertCircleIcon size={14} />
-                    )}
-                    {currentLangMeta.statusLabel}
+                    <SparklesIcon size={14} /> Gemini 2.5 Flash AI
                   </div>
                   <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '4px' }}>
                     Script: {currentLangMeta.script}
@@ -584,73 +701,154 @@ export const ClassroomConsole: React.FC = () => {
                 backgroundColor: '#0a0f1d',
                 border: '1px solid #20314d',
                 borderRadius: '10px',
-                padding: '16px',
-                minHeight: '135px',
+                padding: '18px',
+                minHeight: '160px',
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'center'
               }}>
-                {translationResult.status === 'no_sample' ? (
-                  <div style={{ textAlign: 'center', color: '#94a3b8', padding: '10px' }}>
-                    <AlertCircleIcon size={24} style={{ color: '#eab308', marginBottom: '6px' }} />
-                    <div style={{ fontWeight: 600, color: '#f1f5f9', fontSize: '0.94rem' }}>
-                      No Offline Sample Available
+                {isTranslating ? (
+                  <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                    <div style={{
+                      display: 'inline-block',
+                      width: '32px',
+                      height: '32px',
+                      border: '3px solid rgba(56, 189, 248, 0.2)',
+                      borderTopColor: '#38bdf8',
+                      borderRadius: '50%',
+                      animation: 'spin 1s linear infinite',
+                      marginBottom: '12px'
+                    }} />
+                    <div style={{ fontSize: '0.94rem', fontWeight: 600, color: '#38bdf8' }}>
+                      Translating with Gemini AI...
                     </div>
-                    <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '4px' }}>
-                      To prevent hallucinated translations in classroom settings, arbitrary text requires future cloud AI models. Click any sample card above to see verified offline entries.
-                    </p>
+                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
+                      Contextualizing for primary-school learners in {currentLangMeta.name}
+                    </div>
                   </div>
-                ) : translationResult.status === 'pending_validation' ? (
+                ) : aiError ? (
                   <div style={{
-                    backgroundColor: 'rgba(234, 179, 8, 0.08)',
-                    border: '1px dashed #ca8a04',
+                    backgroundColor: aiErrorCode === 'MISSING_API_KEY' ? 'rgba(234, 179, 8, 0.1)' : 'rgba(220, 38, 38, 0.1)',
+                    border: `1px solid ${aiErrorCode === 'MISSING_API_KEY' ? '#ca8a04' : '#ef4444'}`,
                     borderRadius: '8px',
-                    padding: '16px',
-                    textAlign: 'center'
+                    padding: '16px'
                   }}>
                     <div style={{
-                      fontSize: '1.05rem',
-                      fontWeight: 600,
-                      color: '#fef08a',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      color: aiErrorCode === 'MISSING_API_KEY' ? '#fde047' : '#f87171',
+                      fontWeight: 700,
+                      fontSize: '0.92rem',
                       marginBottom: '6px'
                     }}>
-                      “{translationResult.translationText}”
+                      <AlertCircleIcon size={18} />
+                      <span>{aiErrorCode === 'MISSING_API_KEY' ? 'Gemini API Key Required' : 'Translation Request Notice'}</span>
                     </div>
-                    <div style={{
-                      fontSize: '0.8rem',
-                      color: '#cbd5e1',
-                      lineHeight: 1.5,
-                      marginTop: '4px'
-                    }}>
-                      Language: <strong>{currentLangMeta.name}</strong> • Status: <em>Awaiting field validation with native speakers</em>.
-                    </div>
-                    {translationResult.note && (
-                      <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '6px' }}>
-                        Note: {translationResult.note}
+                    <p style={{ fontSize: '0.84rem', color: '#cbd5e1', lineHeight: 1.5, marginBottom: '8px' }}>
+                      {aiError}
+                    </p>
+                    {aiErrorCode === 'MISSING_API_KEY' && (
+                      <div style={{
+                        backgroundColor: '#0a0f1d',
+                        borderRadius: '6px',
+                        padding: '10px 12px',
+                        fontSize: '0.78rem',
+                        color: '#94a3b8'
+                      }}>
+                        <div>1. Get an API key: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}>Google AI Studio</a></div>
+                        <div>2. Set in <code style={{ color: '#38bdf8' }}>.env</code>: <code style={{ color: '#34d399' }}>GEMINI_API_KEY=your_key_here</code></div>
+                        <div style={{ marginTop: '4px' }}>3. Click Translate or select a sample sentence.</div>
                       </div>
                     )}
+                    {aiErrorCode !== 'MISSING_API_KEY' && (
+                      <button
+                        onClick={handleManualTranslate}
+                        style={{
+                          backgroundColor: '#38bdf8',
+                          color: '#0a0f1d',
+                          border: 'none',
+                          padding: '6px 12px',
+                          borderRadius: '6px',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          marginTop: '6px'
+                        }}
+                      >
+                        Retry Translation
+                      </button>
+                    )}
                   </div>
-                ) : (
+                ) : aiResult ? (
                   <div>
+                    {/* Detected Source & Meta Badge */}
+                    {aiResult.detectedSource && (
+                      <div style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        backgroundColor: '#1b2845',
+                        padding: '3px 8px',
+                        borderRadius: '6px',
+                        fontSize: '0.72rem',
+                        color: '#94a3b8',
+                        marginBottom: '10px'
+                      }}>
+                        <span>Source: <strong style={{ color: '#38bdf8' }}>{aiResult.detectedSource}</strong></span>
+                      </div>
+                    )}
+
+                    {/* Translated Text */}
                     <div style={{
                       fontSize: '1.25rem',
                       fontWeight: 600,
                       lineHeight: 1.6,
                       color: '#38bdf8',
-                      fontFamily: currentLangMeta.id === 'bengali' ? "'Plus Jakarta Sans', sans-serif" : 'inherit'
+                      marginBottom: '8px'
                     }}>
-                      {translationResult.translationText}
+                      {aiResult.translation}
                     </div>
-                    <div style={{
-                      marginTop: '10px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      fontSize: '0.76rem',
-                      color: '#34d399'
-                    }}>
-                      <CheckCircleIcon size={14} /> Verified pedagogical translation for {currentLangMeta.name} primary instruction.
+
+                    {/* Phonetic Pronunciation Guide if provided */}
+                    {aiResult.phonetic && (
+                      <div style={{
+                        fontSize: '0.84rem',
+                        color: '#cbd5e1',
+                        backgroundColor: '#141e33',
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        marginBottom: '8px'
+                      }}>
+                        <strong style={{ color: '#94a3b8' }}>Phonetic Reading: </strong>
+                        <span>{aiResult.phonetic}</span>
+                      </div>
+                    )}
+
+                    {/* Pedagogical Note */}
+                    {aiResult.pedagogicalNote && (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: '6px',
+                        fontSize: '0.76rem',
+                        color: '#34d399',
+                        marginTop: '6px'
+                      }}>
+                        <CheckCircleIcon size={14} style={{ flexShrink: 0, marginTop: '2px' }} />
+                        <span>{aiResult.pedagogicalNote}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ textAlign: 'center', color: '#94a3b8', padding: '16px' }}>
+                    <SparklesIcon size={24} style={{ color: '#38bdf8', marginBottom: '8px' }} />
+                    <div style={{ fontWeight: 600, color: '#f1f5f9', fontSize: '0.94rem' }}>
+                      Ready for Live AI Translation
                     </div>
+                    <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '4px' }}>
+                      Enter or speak any sentence in English, Hindi, Marathi, Hinglish, or slang to see the vernacular pedagogical translation.
+                    </p>
                   </div>
                 )}
               </div>
@@ -671,26 +869,26 @@ export const ClassroomConsole: React.FC = () => {
                 {/* Play Button */}
                 <button
                   onClick={handlePlayAudio}
-                  disabled={translationResult.status === 'no_sample' || isSpeaking}
+                  disabled={!aiResult?.translation || isSpeaking}
                   aria-label="Play translated audio output"
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '6px',
-                    backgroundColor: translationResult.status === 'no_sample' ? '#1e293b' : '#0284c7',
-                    color: translationResult.status === 'no_sample' ? '#64748b' : '#ffffff',
+                    backgroundColor: !aiResult?.translation ? '#1e293b' : '#0284c7',
+                    color: !aiResult?.translation ? '#64748b' : '#ffffff',
                     border: 'none',
                     padding: '8px 16px',
                     borderRadius: '8px',
                     fontWeight: 600,
                     fontSize: '0.86rem',
-                    cursor: translationResult.status === 'no_sample' ? 'not-allowed' : 'pointer',
+                    cursor: !aiResult?.translation ? 'not-allowed' : 'pointer',
                     transition: 'all 0.2s ease',
                     opacity: isSpeaking ? 0.7 : 1
                   }}
                 >
                   <Volume2Icon size={18} />
-                  <span>{isSpeaking ? 'Playing...' : 'Play Audio'}</span>
+                  <span>{isSpeaking ? 'Playing Audio...' : 'Play Audio'}</span>
                 </button>
 
                 {/* Stop Button */}
@@ -721,7 +919,7 @@ export const ClassroomConsole: React.FC = () => {
               {/* Copy Translation Output */}
               <button
                 onClick={handleCopy}
-                disabled={!translationResult.translationText || translationResult.status === 'no_sample'}
+                disabled={!aiResult?.translation}
                 aria-label="Copy translated text to clipboard"
                 style={{
                   display: 'inline-flex',
@@ -733,7 +931,7 @@ export const ClassroomConsole: React.FC = () => {
                   padding: '7px 12px',
                   borderRadius: '6px',
                   fontSize: '0.82rem',
-                  cursor: !translationResult.translationText ? 'not-allowed' : 'pointer'
+                  cursor: !aiResult?.translation ? 'not-allowed' : 'pointer'
                 }}
               >
                 {copied ? <CheckIcon size={16} /> : <CopyIcon size={16} />}
@@ -809,7 +1007,7 @@ export const ClassroomConsole: React.FC = () => {
           <div style={{
             position: 'relative',
             width: '100%',
-            paddingBottom: '56.25%', /* 16:9 Aspect Ratio */
+            paddingBottom: '56.25%',
             height: 0,
             overflow: 'hidden',
             borderRadius: '10px',
