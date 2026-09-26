@@ -6,7 +6,7 @@ interface WelcomeLandingProps {
   onEnter: () => void;
 }
 
-interface FloatingMemberData {
+interface FloatingMember {
   id: string;
   name: string;
   shortName: string;
@@ -17,19 +17,10 @@ interface FloatingMemberData {
   initials: string;
   size: number;
   mobileSize: number;
-  pos: {
-    top?: string;
-    bottom?: string;
-    left?: string;
-    right?: string;
-  };
-  mobilePos: {
-    top?: string;
-    bottom?: string;
-    left?: string;
-    right?: string;
-  };
-  animation: string;
+  // Position around center: top, bottom, left, right, and corners
+  positionStyle: React.CSSProperties;
+  mobilePositionClass: string;
+  animationClass: string;
   duration: string;
   delay: string;
   depth: number;
@@ -39,7 +30,7 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
   const [isExiting, setIsExiting] = useState(false);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
-  // Smooth exit transition handler
+  // Transition handler when entering website
   const handleTransition = useCallback(() => {
     if (isExiting) return;
     setIsExiting(true);
@@ -60,18 +51,18 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleTransition]);
 
-  // Mouse move handler for gentle interactive parallax
+  // Mouse move handler for gentle depth parallax
   const handleMouseMove = (e: React.MouseEvent) => {
     const { innerWidth, innerHeight } = window;
-    const x = (e.clientX / innerWidth - 0.5) * 2; // -1 to 1
-    const y = (e.clientY / innerHeight - 0.5) * 2; // -1 to 1
+    const x = (e.clientX / innerWidth - 0.5) * 2; // -1 to +1
+    const y = (e.clientY / innerHeight - 0.5) * 2; // -1 to +1
     setMousePos({ x, y });
   };
 
-  // Define the 6 floating team members placed in a balanced orbital perimeter around the center
-  const floatingMembers: FloatingMemberData[] = [
+  // Six existing team members positioned around center: Top, Bottom, Left, Right, and Corners
+  const floatingMembers: FloatingMember[] = [
     {
-      id: 'priyanshu',
+      id: 'top-priyanshu',
       name: TEAM_MEMBERS[0].name,
       shortName: 'Priyanshu',
       roleShort: 'Team Lead',
@@ -79,89 +70,94 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
       department: TEAM_MEMBERS[0].department,
       image: TEAM_MEMBERS[0].image,
       initials: TEAM_MEMBERS[0].initials,
-      size: 84,
+      size: 90,
       mobileSize: 52,
-      pos: { top: '8%', left: '7%' },
-      mobilePos: { top: '3%', left: '3%' },
-      animation: 'floatPhoto1',
+      // TOP: centered horizontally above the central box
+      positionStyle: { top: '5%', left: '50%' },
+      mobilePositionClass: 'pos-top',
+      animationClass: 'animate-float-top',
       duration: '7.8s',
       delay: '0s',
-      depth: 1.1
+      depth: 1.15
     },
     {
-      id: 'rommaan',
-      name: TEAM_MEMBERS[1].name,
-      shortName: 'Rommaan',
-      roleShort: 'Frontend',
-      roleFull: TEAM_MEMBERS[1].role,
-      department: TEAM_MEMBERS[1].department,
-      image: TEAM_MEMBERS[1].image,
-      initials: TEAM_MEMBERS[1].initials,
-      size: 78,
-      mobileSize: 50,
-      pos: { top: '9%', right: '8%' },
-      mobilePos: { top: '3%', right: '3%' },
-      animation: 'floatPhoto2',
-      duration: '8.4s',
-      delay: '0.6s',
-      depth: 0.9
-    },
-    {
-      id: 'aditya',
+      id: 'bottom-aditya',
       name: TEAM_MEMBERS[2].name,
       shortName: 'Aditya',
-      roleShort: 'AI / ML',
+      roleShort: 'AI / ML Engineer',
       roleFull: TEAM_MEMBERS[2].role,
       department: TEAM_MEMBERS[2].department,
       image: TEAM_MEMBERS[2].image,
       initials: TEAM_MEMBERS[2].initials,
-      size: 86,
-      mobileSize: 54,
-      pos: { top: '48%', left: '4%' },
-      mobilePos: { top: '33%', left: '2%' },
-      animation: 'floatPhoto3',
-      duration: '9.2s',
-      delay: '1.2s',
+      size: 88,
+      mobileSize: 52,
+      // BOTTOM: centered horizontally below the central box
+      positionStyle: { bottom: '5%', left: '50%' },
+      mobilePositionClass: 'pos-bottom',
+      animationClass: 'animate-float-bottom',
+      duration: '8.4s',
+      delay: '0.8s',
       depth: 1.2
     },
     {
-      id: 'snehal',
-      name: TEAM_MEMBERS[3].name,
-      shortName: 'Snehal',
-      roleShort: 'Voice AI',
-      roleFull: TEAM_MEMBERS[3].role,
-      department: TEAM_MEMBERS[3].department,
-      image: TEAM_MEMBERS[3].image,
-      initials: TEAM_MEMBERS[3].initials,
-      size: 80,
-      mobileSize: 52,
-      pos: { top: '46%', right: '4%' },
-      mobilePos: { top: '33%', right: '2%' },
-      animation: 'floatPhoto4',
-      duration: '7.4s',
+      id: 'left-rommaan',
+      name: TEAM_MEMBERS[1].name,
+      shortName: 'Rommaan',
+      roleShort: 'Frontend Dev',
+      roleFull: TEAM_MEMBERS[1].role,
+      department: TEAM_MEMBERS[1].department,
+      image: TEAM_MEMBERS[1].image,
+      initials: TEAM_MEMBERS[1].initials,
+      size: 86,
+      mobileSize: 50,
+      // LEFT: centered vertically to the left of the central box
+      positionStyle: { top: '50%', left: '5%' },
+      mobilePositionClass: 'pos-left',
+      animationClass: 'animate-float-left',
+      duration: '8.8s',
       delay: '0.4s',
       depth: 0.95
     },
     {
-      id: 'ishan',
+      id: 'right-snehal',
+      name: TEAM_MEMBERS[3].name,
+      shortName: 'Snehal',
+      roleShort: 'Voice Module AI',
+      roleFull: TEAM_MEMBERS[3].role,
+      department: TEAM_MEMBERS[3].department,
+      image: TEAM_MEMBERS[3].image,
+      initials: TEAM_MEMBERS[3].initials,
+      size: 84,
+      mobileSize: 50,
+      // RIGHT: centered vertically to the right of the central box
+      positionStyle: { top: '50%', right: '5%' },
+      mobilePositionClass: 'pos-right',
+      animationClass: 'animate-float-right',
+      duration: '7.4s',
+      delay: '1.2s',
+      depth: 1.05
+    },
+    {
+      id: 'corner-tr-ishan',
       name: TEAM_MEMBERS[4].name,
       shortName: 'Ishan',
-      roleShort: 'Backend',
+      roleShort: 'Backend Developer',
       roleFull: TEAM_MEMBERS[4].role,
       department: TEAM_MEMBERS[4].department,
       image: TEAM_MEMBERS[4].image,
       initials: TEAM_MEMBERS[4].initials,
-      size: 76,
+      size: 82,
       mobileSize: 48,
-      pos: { bottom: '9%', left: '8%' },
-      mobilePos: { bottom: '5%', left: '3%' },
-      animation: 'floatPhoto5',
-      duration: '8.1s',
-      delay: '1.5s',
-      depth: 1.05
+      // TOP-RIGHT CORNER
+      positionStyle: { top: '12%', right: '9%' },
+      mobilePositionClass: 'pos-corner-tr',
+      animationClass: 'animate-float-corner-tr',
+      duration: '8.2s',
+      delay: '0.6s',
+      depth: 0.9
     },
     {
-      id: 'shayantan',
+      id: 'corner-bl-shayantan',
       name: TEAM_MEMBERS[5].name,
       shortName: 'Shayantan',
       roleShort: 'Research & QA',
@@ -169,31 +165,32 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
       department: TEAM_MEMBERS[5].department,
       image: TEAM_MEMBERS[5].image,
       initials: TEAM_MEMBERS[5].initials,
-      size: 78,
-      mobileSize: 50,
-      pos: { bottom: '8%', right: '8%' },
-      mobilePos: { bottom: '5%', right: '3%' },
-      animation: 'floatPhoto6',
-      duration: '8.7s',
-      delay: '0.8s',
-      depth: 0.88
+      size: 82,
+      mobileSize: 48,
+      // BOTTOM-LEFT CORNER
+      positionStyle: { bottom: '12%', left: '9%' },
+      mobilePositionClass: 'pos-corner-bl',
+      animationClass: 'animate-float-corner-bl',
+      duration: '9.2s',
+      delay: '1.5s',
+      depth: 1.0
     }
   ];
 
-  // Floating multilingual education speech bubbles & language symbols
+  // Multilingual education & pedagogy floating elements
   const speechBubbles = [
-    { text: 'A ⇄ 文', script: 'Translation', top: '24%', left: '16%', delay: '0.5s', dur: '6.5s' },
-    { text: 'ज्ञान', script: 'Devanagari (Knowledge)', top: '22%', right: '18%', delay: '1.4s', dur: '7.2s' },
-    { text: 'ᱥᱮᱪᱮᱫ', script: 'Ol Chiki (Learning)', bottom: '24%', left: '17%', delay: '2.1s', dur: '6.8s' },
-    { text: 'শিখুন', script: 'Bengali (Learn)', bottom: '22%', right: '17%', delay: '1.0s', dur: '7.6s' }
+    { text: 'A ⇄ 文', script: 'Translation', top: '24%', left: '16%', dur: '6.8s', delay: '0.3s' },
+    { text: 'ज्ञान', script: 'Devanagari (Knowledge)', top: '22%', right: '17%', dur: '7.5s', delay: '1.2s' },
+    { text: 'ᱥᱮᱪᱮᱫ', script: 'Ol Chiki (Learning)', bottom: '24%', left: '17%', dur: '7.1s', delay: '2.0s' },
+    { text: 'শিখুন', script: 'Bengali (Learn)', bottom: '22%', right: '16%', dur: '8.0s', delay: '0.9s' }
   ];
 
-  // Subtle floating background vernacular glyphs
+  // Floating vernacular characters
   const floatingChars = [
-    { char: 'अ', top: '15%', left: '32%', delay: '0.2s', size: '2.2rem' },
-    { char: 'আ', top: '16%', right: '32%', delay: '1.6s', size: '2.4rem' },
-    { char: 'ᱚ', bottom: '16%', left: '34%', delay: '1.1s', size: '2rem' },
-    { char: 'म', bottom: '15%', right: '33%', delay: '2.4s', size: '2.2rem' }
+    { char: 'अ', top: '16%', left: '33%', delay: '0.2s', size: '2.4rem' },
+    { char: 'আ', top: '16%', right: '33%', delay: '1.4s', size: '2.5rem' },
+    { char: 'ᱚ', bottom: '18%', left: '32%', delay: '0.8s', size: '2.2rem' },
+    { char: 'म', bottom: '18%', right: '32%', delay: '2.2s', size: '2.3rem' }
   ];
 
   const titleLetters = 'BHASHA SETU'.split('');
@@ -203,7 +200,7 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
       onClick={handleTransition}
       onMouseMove={handleMouseMove}
       role="region"
-      aria-label="BHASHA SETU Floating Team & Brand Welcome Screen. Click anywhere or press Enter to continue to website."
+      aria-label="BHASHA SETU Welcome Screen with Floating Team. Click anywhere or press Enter to continue."
       style={{
         position: 'fixed',
         inset: 0,
@@ -213,16 +210,16 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px',
+        padding: '16px',
         cursor: 'pointer',
         overflow: 'hidden',
         userSelect: 'none',
         opacity: isExiting ? 0 : 1,
-        transform: isExiting ? 'scale(1.02)' : 'scale(1)',
+        transform: isExiting ? 'scale(1.03)' : 'scale(1)',
         transition: 'opacity 0.45s ease-out, transform 0.45s ease-out'
       }}
     >
-      {/* Background ambient radial gradients */}
+      {/* Background ambient radial glow orbs */}
       <div
         style={{
           position: 'absolute',
@@ -258,33 +255,30 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
           width: '100%',
           height: '100%',
           pointerEvents: 'none',
-          opacity: 0.18
+          opacity: 0.2
         }}
       >
-        <line x1="8%" y1="12%" x2="16%" y2="28%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
-        <line x1="16%" y1="28%" x2="50%" y2="22%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
-        <line x1="50%" y1="22%" x2="84%" y2="14%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
-        <line x1="84%" y1="14%" x2="92%" y2="48%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
-        <line x1="92%" y1="48%" x2="84%" y2="84%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
-        <line x1="84%" y1="84%" x2="50%" y2="78%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
-        <line x1="50%" y1="78%" x2="14%" y2="82%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
-        <line x1="14%" y1="82%" x2="6%" y2="48%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
-        <line x1="6%" y1="48%" x2="8%" y2="12%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
-        <circle cx="8%" cy="12%" r="4" fill="#38bdf8" />
-        <circle cx="84%" cy="14%" r="4" fill="#60a5fa" />
-        <circle cx="92%" cy="48%" r="4" fill="#2dd4bf" />
-        <circle cx="84%" cy="84%" r="4" fill="#a78bfa" />
-        <circle cx="14%" cy="82%" r="4" fill="#38bdf8" />
-        <circle cx="6%" cy="48%" r="4" fill="#2dd4bf" />
+        <line x1="50%" y1="12%" x2="91%" y2="18%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
+        <line x1="91%" y1="18%" x2="95%" y2="50%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
+        <line x1="95%" y1="50%" x2="50%" y2="88%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
+        <line x1="50%" y1="88%" x2="9%" y2="82%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
+        <line x1="9%" y1="82%" x2="5%" y2="50%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
+        <line x1="5%" y1="50%" x2="50%" y2="12%" stroke="#38bdf8" strokeWidth="1" strokeDasharray="4 4" />
+        <circle cx="50%" cy="12%" r="4" fill="#38bdf8" />
+        <circle cx="91%" cy="18%" r="4" fill="#60a5fa" />
+        <circle cx="95%" cy="50%" r="4" fill="#2dd4bf" />
+        <circle cx="50%" cy="88%" r="4" fill="#a78bfa" />
+        <circle cx="9%" cy="82%" r="4" fill="#60a5fa" />
+        <circle cx="5%" cy="50%" r="4" fill="#38bdf8" />
       </svg>
 
-      {/* Top Header Controls: Skip Button */}
+      {/* Top Header Controls: Skip / Enter Directly Button */}
       <div
         style={{
           position: 'absolute',
           top: '20px',
           right: '24px',
-          zIndex: 30
+          zIndex: 35
         }}
       >
         <button
@@ -292,17 +286,17 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
             e.stopPropagation();
             handleTransition();
           }}
-          aria-label="Skip to website directly"
+          aria-label="Enter website directly"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            backgroundColor: 'rgba(15, 23, 42, 0.75)',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
+            backgroundColor: 'rgba(15, 23, 42, 0.8)',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
             color: '#e2e8f0',
             padding: '7px 16px',
             borderRadius: '999px',
-            fontSize: '0.8rem',
+            fontSize: '0.82rem',
             fontWeight: 600,
             cursor: 'pointer',
             transition: 'all 0.2s ease',
@@ -313,8 +307,8 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
             e.currentTarget.style.borderColor = '#38bdf8';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'rgba(15, 23, 42, 0.75)';
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.15)';
+            e.currentTarget.style.backgroundColor = 'rgba(15, 23, 42, 0.8)';
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)';
           }}
         >
           <span>Enter Directly</span>
@@ -323,120 +317,147 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
       </div>
 
       {/* ======================================================== */}
-      {/* FLOATING TEAM MEMBER PHOTOS (Orbits Around Center)       */}
+      {/* FLOATING TEAM MEMBERS (Top, Bottom, Left, Right, Corners)*/}
       {/* ======================================================== */}
       {floatingMembers.map((member) => {
-        // Calculate interactive parallax offset
-        const parallaxX = mousePos.x * member.depth * 14;
-        const parallaxY = mousePos.y * member.depth * 14;
+        // Multi-layered interactive mouse parallax offset
+        const parallaxX = mousePos.x * member.depth * 15;
+        const parallaxY = mousePos.y * member.depth * 15;
 
         return (
           <div
             key={member.id}
-            className={`floating-member-wrapper ${member.id}`}
+            className={`floating-member-positioner ${member.mobilePositionClass}`}
             style={{
               position: 'absolute',
-              ...member.pos,
-              zIndex: 15,
-              animation: `${member.animation} ${member.duration} ease-in-out infinite`,
-              animationDelay: member.delay,
-              transform: `translate(${parallaxX}px, ${parallaxY}px)`,
-              transition: 'transform 0.2s ease-out'
+              ...member.positionStyle,
+              zIndex: 15
             }}
           >
+            {/* Parallax layer */}
             <div
-              className="photo-bubble"
-              title={`${member.name} (${member.roleFull} - ${member.department})`}
               style={{
-                position: 'relative',
-                width: `${member.size}px`,
-                height: `${member.size}px`,
-                borderRadius: '50%',
-                padding: '3px',
-                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.9) 0%, rgba(99, 102, 241, 0.4) 100%)',
-                boxShadow: '0 0 24px rgba(56, 189, 248, 0.4), 0 10px 28px rgba(0, 0, 0, 0.6)',
-                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-                cursor: 'pointer'
+                transform: `translate(${parallaxX}px, ${parallaxY}px)`,
+                transition: 'transform 0.18s ease-out'
               }}
             >
-              {/* Actual Member Image */}
-              <img
-                src={member.image || ''}
-                alt={member.name}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: '50%',
-                  objectFit: 'cover',
-                  display: 'block'
-                }}
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  target.style.display = 'none';
-                  if (target.nextElementSibling) {
-                    (target.nextElementSibling as HTMLElement).style.display = 'flex';
-                  }
-                }}
-              />
-
-              {/* Fallback initials if needed */}
+              {/* Continuous floating animation layer with independent rotation */}
               <div
+                className={member.animationClass}
                 style={{
-                  display: 'none',
-                  width: '100%',
-                  height: '100%',
-                  borderRadius: '50%',
-                  backgroundColor: '#0f172a',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#38bdf8',
-                  fontWeight: 700,
-                  fontSize: '1.1rem'
+                  animationDuration: member.duration,
+                  animationDelay: member.delay
                 }}
               >
-                {member.initials}
-              </div>
+                {/* Photo Frame Container */}
+                <div
+                  className="photo-frame-bubble"
+                  title={`${member.name} — ${member.roleFull} (${member.department})`}
+                  style={{
+                    position: 'relative',
+                    width: `${member.size}px`,
+                    height: `${member.size}px`,
+                    borderRadius: '50%',
+                    padding: '3px',
+                    background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.95) 0%, rgba(99, 102, 241, 0.5) 100%)',
+                    boxShadow: '0 0 25px rgba(56, 189, 248, 0.45), 0 0 50px rgba(14, 165, 233, 0.2), 0 12px 30px rgba(0, 0, 0, 0.65)',
+                    transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {/* Subtle soft cyan aura glow */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: '-8px',
+                      borderRadius: '50%',
+                      background: 'radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, transparent 70%)',
+                      filter: 'blur(8px)',
+                      pointerEvents: 'none'
+                    }}
+                  />
 
-              {/* Green online / verified dot */}
-              <span
-                style={{
-                  position: 'absolute',
-                  bottom: '2px',
-                  right: '2px',
-                  width: '14px',
-                  height: '14px',
-                  backgroundColor: '#22c55e',
-                  borderRadius: '50%',
-                  border: '2px solid #070b14',
-                  boxShadow: '0 0 8px rgba(34, 197, 94, 0.6)'
-                }}
-              />
+                  {/* Member Photo */}
+                  <img
+                    src={member.image || ''}
+                    alt={member.name}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                      display: 'block'
+                    }}
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      target.style.display = 'none';
+                      if (target.nextElementSibling) {
+                        (target.nextElementSibling as HTMLElement).style.display = 'flex';
+                      }
+                    }}
+                  />
 
-              {/* Name & Role Badge Pill Attached to Frame */}
-              <div
-                className="member-tag-pill"
-                style={{
-                  position: 'absolute',
-                  bottom: '-14px',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  backgroundColor: 'rgba(7, 11, 20, 0.92)',
-                  border: '1px solid rgba(56, 189, 248, 0.35)',
-                  borderRadius: '999px',
-                  padding: '2px 9px',
-                  fontSize: '0.68rem',
-                  fontWeight: 600,
-                  color: '#e2e8f0',
-                  whiteSpace: 'nowrap',
-                  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.55)',
-                  backdropFilter: 'blur(8px)',
-                  pointerEvents: 'none',
-                  letterSpacing: '0.01em'
-                }}
-              >
-                <span style={{ color: '#38bdf8' }}>{member.shortName}</span>
-                <span style={{ color: '#64748b', margin: '0 4px' }}>•</span>
-                <span style={{ color: '#cbd5e1' }}>{member.roleShort}</span>
+                  {/* Fallback initials if image fails */}
+                  <div
+                    style={{
+                      display: 'none',
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '50%',
+                      backgroundColor: '#0f172a',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#38bdf8',
+                      fontWeight: 700,
+                      fontSize: '1.15rem'
+                    }}
+                  >
+                    {member.initials}
+                  </div>
+
+                  {/* Online / Active Indicator Dot */}
+                  <span
+                    style={{
+                      position: 'absolute',
+                      bottom: '2px',
+                      right: '2px',
+                      width: '14px',
+                      height: '14px',
+                      backgroundColor: '#22c55e',
+                      borderRadius: '50%',
+                      border: '2px solid #070b14',
+                      boxShadow: '0 0 8px rgba(34, 197, 94, 0.7)'
+                    }}
+                    title="Verified Team Contributor"
+                  />
+
+                  {/* Floating Identity Pill Tag Below Frame */}
+                  <div
+                    className="member-tag-pill"
+                    style={{
+                      position: 'absolute',
+                      bottom: '-15px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      backgroundColor: 'rgba(7, 11, 20, 0.94)',
+                      border: '1px solid rgba(56, 189, 248, 0.35)',
+                      borderRadius: '999px',
+                      padding: '2.5px 10px',
+                      fontSize: '0.7rem',
+                      fontWeight: 600,
+                      color: '#e2e8f0',
+                      whiteSpace: 'nowrap',
+                      boxShadow: '0 4px 14px rgba(0, 0, 0, 0.65)',
+                      backdropFilter: 'blur(8px)',
+                      pointerEvents: 'none',
+                      letterSpacing: '0.01em'
+                    }}
+                  >
+                    <span style={{ color: '#38bdf8' }}>{member.shortName}</span>
+                    <span style={{ color: '#64748b', margin: '0 4px' }}>•</span>
+                    <span style={{ color: '#cbd5e1' }}>{member.roleShort}</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -444,7 +465,7 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
       })}
 
       {/* ======================================================== */}
-      {/* FLOATING MULTILINGUAL SPEECH BUBBLES                     */}
+      {/* FLOATING MULTILINGUAL & PEDAGOGY ELEMENTS                */}
       {/* ======================================================== */}
       {speechBubbles.map((bubble, i) => (
         <div
@@ -457,15 +478,15 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
             left: bubble.left,
             right: bubble.right,
             zIndex: 12,
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            border: '1px solid rgba(56, 189, 248, 0.25)',
-            padding: '5px 13px',
+            backgroundColor: 'rgba(15, 23, 42, 0.68)',
+            border: '1px solid rgba(56, 189, 248, 0.28)',
+            padding: '5px 14px',
             borderRadius: '12px',
-            fontSize: '0.8rem',
+            fontSize: '0.82rem',
             fontWeight: 700,
             color: '#38bdf8',
             backdropFilter: 'blur(8px)',
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.35)',
+            boxShadow: '0 4px 18px rgba(0, 0, 0, 0.35)',
             pointerEvents: 'none',
             animation: `floatBubble ${bubble.dur} ease-in-out infinite`,
             animationDelay: bubble.delay
@@ -476,11 +497,11 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
         </div>
       ))}
 
-      {/* Subtle Floating Vernacular Glyphs */}
+      {/* Ambient Vernacular Glyphs */}
       {floatingChars.map((item, index) => (
         <div
           key={index}
-          className="floating-char"
+          className="floating-glyph"
           style={{
             position: 'absolute',
             top: item.top,
@@ -490,7 +511,7 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
             fontSize: item.size,
             fontWeight: 700,
             color: 'rgba(56, 189, 248, 0.16)',
-            animation: `floatSlow 6s ease-in-out infinite`,
+            animation: `floatSlow 6.5s ease-in-out infinite`,
             animationDelay: item.delay,
             pointerEvents: 'none',
             textShadow: '0 0 20px rgba(56, 189, 248, 0.15)',
@@ -506,14 +527,14 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
       {/* ======================================================== */}
       <div
         style={{
-          maxWidth: '720px',
+          maxWidth: '680px',
           textAlign: 'center',
           position: 'relative',
-          zIndex: 20,
-          padding: '10px 16px'
+          zIndex: 25,
+          padding: '12px 18px'
         }}
       >
-        {/* Glowing SIH Badge */}
+        {/* SIH Hackathon Glowing Badge */}
         <div
           className="landing-badge"
           style={{
@@ -535,7 +556,7 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
           <span>Smart India Hackathon • Vernacular Pedagogy</span>
         </div>
 
-        {/* Brand Name with Letter-Reveal Animation */}
+        {/* Brand Name with Staggered Letter-Reveal Animation */}
         <h1
           style={{
             fontSize: 'clamp(2.6rem, 7.5vw, 5.2rem)',
@@ -582,7 +603,7 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
           “We Don’t Translate Words, We Translate Learnings.”
         </div>
 
-        {/* Supporting Text */}
+        {/* Supporting Line */}
         <p
           className="fade-in-delayed"
           style={{
@@ -596,7 +617,7 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
           Bridging Languages, Empowering Learning.
         </p>
 
-        {/* Audio / Voicewave Pill */}
+        {/* Audio / Voicewave Badge */}
         <div
           className="fade-in-delayed"
           style={{
@@ -668,89 +689,114 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
       </div>
 
       {/* ======================================================== */}
-      {/* CSS KEYFRAMES FOR FLOATING MOVEMENTS & RESPONSIVENESS    */}
+      {/* CSS KEYFRAMES & STYLING FOR FLOATING MOVEMENTS           */}
       {/* ======================================================== */}
       <style>{`
-        /* Independent floating movements for each of the 6 photos */
-        @keyframes floatPhoto1 {
+        /* Independent floating movements for TOP, BOTTOM, LEFT, RIGHT, and CORNERS */
+        
+        /* 1. TOP (Priyanshu): Centered horizontally, undulating vertically with gentle tilt */
+        @keyframes floatTopKeyframe {
+          0%, 100% {
+            transform: translate(-50%, 0px) rotate(0deg);
+          }
+          33% {
+            transform: translate(calc(-50% + 8px), -14px) rotate(2deg);
+          }
+          66% {
+            transform: translate(calc(-50% - 9px), 8px) rotate(-1.5deg);
+          }
+        }
+        .animate-float-top {
+          animation: floatTopKeyframe infinite ease-in-out;
+        }
+
+        /* 2. BOTTOM (Aditya): Centered horizontally, swaying vertically and horizontally */
+        @keyframes floatBottomKeyframe {
+          0%, 100% {
+            transform: translate(-50%, 0px) rotate(0deg);
+          }
+          33% {
+            transform: translate(calc(-50% - 10px), 12px) rotate(-2deg);
+          }
+          66% {
+            transform: translate(calc(-50% + 9px), -9px) rotate(1.8deg);
+          }
+        }
+        .animate-float-bottom {
+          animation: floatBottomKeyframe infinite ease-in-out;
+        }
+
+        /* 3. LEFT (Rommaan): Centered vertically, drifting horizontally with tilt */
+        @keyframes floatLeftKeyframe {
+          0%, 100% {
+            transform: translate(0px, -50%) rotate(0deg);
+          }
+          33% {
+            transform: translate(11px, calc(-50% + 10px)) rotate(1.8deg);
+          }
+          66% {
+            transform: translate(-7px, calc(-50% - 12px)) rotate(-2deg);
+          }
+        }
+        .animate-float-left {
+          animation: floatLeftKeyframe infinite ease-in-out;
+        }
+
+        /* 4. RIGHT (Snehal): Centered vertically, counter-drifting horizontally with tilt */
+        @keyframes floatRightKeyframe {
+          0%, 100% {
+            transform: translate(0px, -50%) rotate(0deg);
+          }
+          33% {
+            transform: translate(-10px, calc(-50% - 11px)) rotate(-1.8deg);
+          }
+          66% {
+            transform: translate(12px, calc(-50% + 9px)) rotate(2deg);
+          }
+        }
+        .animate-float-right {
+          animation: floatRightKeyframe infinite ease-in-out;
+        }
+
+        /* 5. TOP-RIGHT CORNER (Ishan): Orbiting diagonally */
+        @keyframes floatCornerTRKeyframe {
           0%, 100% {
             transform: translate(0px, 0px) rotate(0deg);
           }
           33% {
-            transform: translate(8px, -15px) rotate(2deg);
+            transform: translate(-12px, 11px) rotate(-2deg);
           }
           66% {
-            transform: translate(-10px, 9px) rotate(-1.5deg);
+            transform: translate(10px, -11px) rotate(1.8deg);
           }
         }
+        .animate-float-corner-tr {
+          animation: floatCornerTRKeyframe infinite ease-in-out;
+        }
 
-        @keyframes floatPhoto2 {
+        /* 6. BOTTOM-LEFT CORNER (Shayantan): Counter-orbiting diagonally */
+        @keyframes floatCornerBLKeyframe {
           0%, 100% {
             transform: translate(0px, 0px) rotate(0deg);
           }
           33% {
-            transform: translate(-12px, -9px) rotate(-2deg);
+            transform: translate(12px, -10px) rotate(2deg);
           }
           66% {
-            transform: translate(7px, 12px) rotate(1.8deg);
+            transform: translate(-9px, 12px) rotate(-1.8deg);
           }
         }
-
-        @keyframes floatPhoto3 {
-          0%, 100% {
-            transform: translate(0px, 0px) rotate(0deg);
-          }
-          33% {
-            transform: translate(11px, 10px) rotate(1.6deg);
-          }
-          66% {
-            transform: translate(-9px, -12px) rotate(-2deg);
-          }
+        .animate-float-corner-bl {
+          animation: floatCornerBLKeyframe infinite ease-in-out;
         }
 
-        @keyframes floatPhoto4 {
-          0%, 100% {
-            transform: translate(0px, 0px) rotate(0deg);
-          }
-          33% {
-            transform: translate(-10px, 12px) rotate(-1.8deg);
-          }
-          66% {
-            transform: translate(12px, -8px) rotate(1.5deg);
-          }
+        /* Hover interactions on photo bubbles */
+        .photo-frame-bubble:hover {
+          transform: scale(1.12) !important;
+          box-shadow: 0 0 35px rgba(56, 189, 248, 0.8), 0 0 65px rgba(14, 165, 233, 0.4), 0 16px 36px rgba(0, 0, 0, 0.75) !important;
         }
 
-        @keyframes floatPhoto5 {
-          0%, 100% {
-            transform: translate(0px, 0px) rotate(0deg);
-          }
-          33% {
-            transform: translate(12px, -11px) rotate(2deg);
-          }
-          66% {
-            transform: translate(-7px, 10px) rotate(-1.6deg);
-          }
-        }
-
-        @keyframes floatPhoto6 {
-          0%, 100% {
-            transform: translate(0px, 0px) rotate(0deg);
-          }
-          33% {
-            transform: translate(-11px, 11px) rotate(-2deg);
-          }
-          66% {
-            transform: translate(9px, -9px) rotate(1.6deg);
-          }
-        }
-
-        /* Hover interaction on photos */
-        .photo-bubble:hover {
-          transform: scale(1.1) !important;
-          box-shadow: 0 0 35px rgba(56, 189, 248, 0.8), 0 14px 35px rgba(0, 0, 0, 0.7) !important;
-        }
-
-        /* Floating speech bubbles animation */
+        /* Speech bubbles float animation */
         @keyframes floatBubble {
           0%, 100% {
             transform: translateY(0px) rotate(0deg);
@@ -760,13 +806,13 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
           }
         }
 
-        /* Ambient characters floating */
+        /* Ambient characters float */
         @keyframes floatSlow {
           0%, 100% {
             transform: translateY(0px) rotate(0deg);
           }
           50% {
-            transform: translateY(-16px) rotate(4deg);
+            transform: translateY(-15px) rotate(3deg);
           }
         }
 
@@ -844,36 +890,59 @@ export const WelcomeLanding: React.FC<WelcomeLandingProps> = ({ onEnter }) => {
           animation-delay: 0.4s;
         }
 
-        /* Mobile Responsive adjustments: scale photos and reposition */
+        /* Responsive adjustments for Mobile screens */
         @media (max-width: 768px) {
-          .floating-member-wrapper.priyanshu { top: 3% !important; left: 3% !important; }
-          .floating-member-wrapper.rommaan { top: 3% !important; right: 3% !important; }
-          .floating-member-wrapper.aditya { top: 30% !important; left: 2% !important; }
-          .floating-member-wrapper.snehal { top: 30% !important; right: 2% !important; }
-          .floating-member-wrapper.ishan { bottom: 5% !important; left: 3% !important; }
-          .floating-member-wrapper.shayantan { bottom: 5% !important; right: 3% !important; }
+          .floating-member-positioner.pos-top {
+            top: 2% !important;
+            left: 50% !important;
+          }
+          .floating-member-positioner.pos-bottom {
+            bottom: 2% !important;
+            left: 50% !important;
+          }
+          .floating-member-positioner.pos-left {
+            top: 28% !important;
+            left: 2% !important;
+          }
+          .floating-member-positioner.pos-right {
+            top: 28% !important;
+            right: 2% !important;
+          }
+          .floating-member-positioner.pos-corner-tr {
+            top: 72% !important;
+            right: 4% !important;
+          }
+          .floating-member-positioner.pos-corner-bl {
+            bottom: 12% !important;
+            left: 4% !important;
+          }
 
-          .photo-bubble {
-            width: 52px !important;
-            height: 52px !important;
+          .photo-frame-bubble {
+            width: 50px !important;
+            height: 50px !important;
           }
 
           .member-tag-pill {
-            display: none !important; /* Hide tiny text on mobile to keep view clean */
+            display: none !important;
           }
 
           .floating-speech-bubble {
-            display: none !important; /* Prevent clutter on small screens */
+            display: none !important;
           }
         }
 
         /* Accessibility: Support reduced motion */
         @media (prefers-reduced-motion: reduce) {
-          .floating-member-wrapper,
-          .photo-bubble,
+          .animate-float-top,
+          .animate-float-bottom,
+          .animate-float-left,
+          .animate-float-right,
+          .animate-float-corner-tr,
+          .animate-float-corner-bl,
+          .photo-frame-bubble,
           .reveal-letter,
           .fade-in-delayed,
-          .floating-char,
+          .floating-glyph,
           .floating-speech-bubble,
           .enter-btn-glow,
           .soundwave-bar {

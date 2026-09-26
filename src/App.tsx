@@ -12,9 +12,14 @@ import { WelcomeLanding } from './components/WelcomeLanding';
 export const App: React.FC = () => {
   const [hasEntered, setHasEntered] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      // If user directly opened a section anchor or already entered during this browser session
-      if (window.location.hash && window.location.hash !== '#home') return true;
-      return sessionStorage.getItem('bhasha_setu_entered') === 'true';
+      // If user directly opened a deep anchor link (e.g. #demo, #how-it-works, #team), skip landing
+      if (window.location.hash && window.location.hash !== '#home' && window.location.hash !== '#') {
+        return true;
+      }
+      // Check query parameter: e.g. ?landing=false to bypass
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('landing') === 'false') return true;
+      return false; // Default to showing the landing page so the user and evaluators always see it
     }
     return false;
   });
@@ -26,11 +31,15 @@ export const App: React.FC = () => {
     setHasEntered(true);
   };
 
+  const handleReplayIntro = () => {
+    setHasEntered(false);
+  };
+
   return (
     <>
       {!hasEntered && <WelcomeLanding onEnter={handleEnter} />}
       <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-        <Navbar />
+        <Navbar onReplayIntro={handleReplayIntro} />
         <main style={{ flex: 1 }}>
           <Hero />
           <ClassroomConsole />

@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
 import { SparklesIcon } from './Icons';
 
-export const Navbar: React.FC = () => {
+interface NavbarProps {
+  onReplayIntro?: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({ onReplayIntro }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const navLinks = [
@@ -96,6 +100,38 @@ export const Navbar: React.FC = () => {
               {link.name}
             </a>
           ))}
+
+          {onReplayIntro && (
+            <button
+              onClick={onReplayIntro}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.84rem',
+                fontWeight: 600,
+                color: '#38bdf8',
+                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+              title="Show Animated Team Intro"
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.2)';
+                e.currentTarget.style.borderColor = '#38bdf8';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.3)';
+              }}
+            >
+              <SparklesIcon size={14} />
+              <span>Intro</span>
+            </button>
+          )}
 
           <a
             href="#demo"
