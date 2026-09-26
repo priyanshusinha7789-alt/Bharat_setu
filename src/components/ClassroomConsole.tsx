@@ -14,7 +14,8 @@ import {
   CopyIcon,
   CheckIcon,
   BookOpenIcon,
-  SparklesIcon
+  SparklesIcon,
+  ExternalLinkIcon
 } from './Icons';
 
 export const ClassroomConsole: React.FC = () => {
@@ -742,6 +743,95 @@ export const ClassroomConsole: React.FC = () => {
 
           </div>
 
+        </div>
+
+        {/* Live Video Demo */}
+        <div id="video-demo" style={{
+          marginTop: '3rem',
+          backgroundColor: '#0a0f1d',
+          border: '1px solid #20314d',
+          borderRadius: '14px',
+          padding: '24px',
+          boxShadow: '0 4px 24px rgba(0, 0, 0, 0.45)'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '12px',
+            marginBottom: '16px'
+          }}>
+            <div>
+              <div style={{
+                fontSize: '0.74rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.08em',
+                color: '#38bdf8',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                marginBottom: '4px'
+              }}>
+                <SparklesIcon size={14} /> Classroom Walkthrough
+              </div>
+              <h3 style={{ fontSize: '1.25rem', color: '#ffffff', margin: 0 }}>
+                Live Video Demo
+              </h3>
+            </div>
+            <a
+              href="https://youtu.be/SrssraZoRGo?si=6a9bINTnXxfiLZ-p"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Watch live video demo on YouTube (opens in new tab)"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                color: '#38bdf8',
+                fontSize: '0.84rem',
+                fontWeight: 600,
+                textDecoration: 'none',
+                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                border: '1px solid rgba(56, 189, 248, 0.25)',
+                padding: '7px 14px',
+                borderRadius: '8px',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <span>Watch on YouTube</span>
+              <ExternalLinkIcon size={14} />
+            </a>
+          </div>
+
+          {/* Responsive 16:9 Video Container */}
+          <div style={{
+            position: 'relative',
+            width: '100%',
+            paddingBottom: '56.25%', /* 16:9 Aspect Ratio */
+            height: 0,
+            overflow: 'hidden',
+            borderRadius: '10px',
+            backgroundColor: '#000000',
+            border: '1px solid #1e293b'
+          }}>
+            <iframe
+              src="https://www.youtube.com/embed/SrssraZoRGo"
+              title="BHASHA SETU Live Video Demo"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              referrerPolicy="strict-origin-when-cross-origin"
+              allowFullScreen
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%',
+                border: 0
+              }}
+            />
+          </div>
         </div>
 
       </div>
