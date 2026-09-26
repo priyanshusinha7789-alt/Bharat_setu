@@ -38,7 +38,8 @@ export const TEAM_MEMBERS: TeamMember[] = [
     role: 'Backend & Database Developer',
     department: 'Information Technology',
     linkedinUrl: 'https://www.linkedin.com/in/ishan-saha-2103b723b',
-    initials: 'IS'
+    initials: 'IS',
+    image: '/team/ishan.jpg'
   },
   {
     name: 'Shayantan Mondal',
