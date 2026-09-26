@@ -23,9 +23,10 @@ export interface TranslationResponse {
   detectedSource?: string;
   pedagogicalNote?: string;
   targetLanguage: string;
+  modelUsed?: string;
   visual?: VisualMetadata;
   error?: string;
-  errorCode?: 'MISSING_API_KEY' | 'API_ERROR' | 'UNSUPPORTED_LANGUAGE' | 'INVALID_INPUT';
+  errorCode?: 'MISSING_API_KEY' | 'API_ERROR' | 'UNSUPPORTED_LANGUAGE' | 'INVALID_INPUT' | 'QUOTA_EXCEEDED';
 }
 
 const LANGUAGE_METADATA: Record<string, { name: string; script: string; family: string }> = {
@@ -114,31 +115,38 @@ OUTPUT FORMAT: Return ONLY valid, raw JSON (no markdown formatting, no code fenc
   }
 }`;
 
-    // Call Gemini 3.8 Flash (with fallback to gemini-2.0-flash / gemini-1.5-flash if needed)
-    let response;
-    try {
-      response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: [
-          { role: 'user', parts: [{ text: `${systemPrompt}\n\nUSER INPUT TO TRANSLATE:\n"${text.trim()}"` }] }
-        ]
-      });
-    } catch {
+    // Models to try in order of priority:
+    // 1. Primary requested: gemini-3.8-flash
+    // 2. Verified active fallbacks supported by this API key: gemini-3.5-flash, gemini-3.5-flash-lite, gemini-3.1-flash-lite
+    const modelsToTry = [
+      'gemini-3.8-flash',
+      'gemini-3.5-flash',
+      'gemini-3.5-flash-lite',
+      'gemini-3.1-flash-lite'
+    ];
+
+    let response: any = null;
+    let modelUsed = '';
+    let lastError: any = null;
+
+    for (const model of modelsToTry) {
       try {
         response = await ai.models.generateContent({
-          model: 'gemini-2.0-flash',
+          model,
           contents: [
             { role: 'user', parts: [{ text: `${systemPrompt}\n\nUSER INPUT TO TRANSLATE:\n"${text.trim()}"` }] }
           ]
         });
-      } catch {
-        response = await ai.models.generateContent({
-          model: 'gemini-1.5-flash',
-          contents: [
-            { role: 'user', parts: [{ text: `${systemPrompt}\n\nUSER INPUT TO TRANSLATE:\n"${text.trim()}"` }] }
-          ]
-        });
+        modelUsed = model;
+        break; // Successfully got response, stop trying fallbacks
+      } catch (err: any) {
+        lastError = err;
+        // Proceed to next fallback model
       }
+    }
+
+    if (!response || !modelUsed) {
+      throw lastError || new Error('All translation models in the fallback chain failed.');
     }
 
     const rawOutput = response.text?.trim() || '';
@@ -170,20 +178,26 @@ OUTPUT FORMAT: Return ONLY valid, raw JSON (no markdown formatting, no code fenc
       detectedSource: parsed.detectedSource || 'Auto-detected',
       pedagogicalNote: parsed.pedagogicalNote || undefined,
       targetLanguage,
+      modelUsed,
       visual
     };
   } catch (err: any) {
     const errorStr = String(err?.message || err);
     let userFriendlyMsg = 'Gemini translation request failed. Please check your network connection and API key.';
+    let errorCode: TranslationResponse['errorCode'] = 'API_ERROR';
 
     if (errorStr.includes('API_KEY_INVALID') || errorStr.includes('invalid api key') || errorStr.includes('401')) {
       userFriendlyMsg = 'Invalid Gemini API Key. Please verify the GEMINI_API_KEY in your .env file.';
-    } else if (errorStr.includes('RESOURCE_EXHAUSTED') || errorStr.includes('429')) {
-      userFriendlyMsg = 'Gemini API quota exceeded. Please try again in a few moments.';
+      errorCode = 'API_ERROR';
+    } else if (errorStr.includes('RESOURCE_EXHAUSTED') || errorStr.includes('429') || errorStr.includes('Quota exceeded')) {
+      userFriendlyMsg = 'Gemini API quota exceeded for your project. Please check your quota at https://ai.dev/rate-limit or retry in a few moments.';
+      errorCode = 'QUOTA_EXCEEDED';
     } else if (errorStr.includes('PERMISSION_DENIED') || errorStr.includes('403')) {
       userFriendlyMsg = 'Permission denied for this Gemini API key. Ensure the Generative Language API is enabled.';
+      errorCode = 'API_ERROR';
     } else if (errorStr.includes('FETCH_ERROR') || errorStr.includes('ENOTFOUND')) {
       userFriendlyMsg = 'Network connectivity error reaching Google Gemini API. Please check your internet connection.';
+      errorCode = 'API_ERROR';
     }
 
     return {
@@ -191,7 +205,7 @@ OUTPUT FORMAT: Return ONLY valid, raw JSON (no markdown formatting, no code fenc
       translation: '',
       targetLanguage,
       error: userFriendlyMsg,
-      errorCode: 'API_ERROR'
+      errorCode
     };
   }
 }

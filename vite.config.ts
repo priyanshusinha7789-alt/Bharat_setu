@@ -39,7 +39,7 @@ function bhashaSetuApiPlugin(): Plugin {
               });
 
               res.setHeader('Content-Type', 'application/json; charset=utf-8');
-              res.statusCode = result.success ? 200 : (result.errorCode === 'MISSING_API_KEY' ? 400 : 500);
+              res.statusCode = result.success ? 200 : (result.errorCode === 'MISSING_API_KEY' ? 400 : (result.errorCode === 'QUOTA_EXCEEDED' ? 429 : 500));
               res.end(JSON.stringify(result));
             } catch (err: any) {
               res.setHeader('Content-Type', 'application/json; charset=utf-8');
