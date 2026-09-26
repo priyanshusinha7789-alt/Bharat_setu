@@ -18,6 +18,7 @@ import {
   SparklesIcon,
   ExternalLinkIcon
 } from './Icons';
+import { VisualLearningPanel } from './VisualLearningPanel';
 
 const SOURCE_LANGUAGES = [
   { code: 'en-IN', label: 'English (India / Hinglish)' },
@@ -852,6 +853,14 @@ export const ClassroomConsole: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Animated Visual Learning Panel */}
+              <VisualLearningPanel
+                visual={aiResult?.visual}
+                sourceText={inputText}
+                targetLangName={currentLangMeta.name}
+                isLoading={isTranslating}
+              />
             </div>
 
             {/* Audio & Action Controls Footer */}

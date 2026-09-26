@@ -106,12 +106,27 @@ async function runTests() {
   const badLangRes = await translateWithGemini({ text: 'Plants need sunlight', targetLanguage: 'klingon' });
   assert(badLangRes.success === false && badLangRes.errorCode === 'UNSUPPORTED_LANGUAGE', 'Rejects unsupported language');
 
-  // Restore env
-  if (origKey) process.env.GEMINI_API_KEY = origKey;
-  else delete process.env.GEMINI_API_KEY;
+  // 6. Check Visual Learning Fallback Classifier
+  console.log('\n--- Testing Visual Learning Classifier ---');
+  import('./src/server/translateService.ts').then(({ detectVisualFallback }) => {
+    const vPlant = detectVisualFallback('Plants need sunlight, water and carbon dioxide');
+    assert(vPlant.visualType === 'plant_growth', 'Correctly classifies plant growth concept');
 
-  console.log(`\nResults: ${passed} passed, ${failed} failed`);
-  if (failed > 0) process.exit(1);
+    const vWater = detectVisualFallback('Water changes into vapour when heated');
+    assert(vWater.visualType === 'water_cycle', 'Correctly classifies water cycle & evaporation concept');
+
+    const vTri = detectVisualFallback('A triangle has three sides');
+    assert(vTri.visualType === 'triangle_geometry', 'Correctly classifies triangle geometry concept');
+
+    const vTriMarathi = detectVisualFallback('triangle la teen baaju astat poranno');
+    assert(vTriMarathi.visualType === 'triangle_geometry', 'Correctly classifies Marathi triangle concept');
+
+    const vChat = detectVisualFallback('Hello kaise ho bhai, listen to me');
+    assert(vChat.visualType === 'classroom_chat', 'Correctly classifies classroom dialogue / chat');
+
+    console.log(`\nFinal Results: ${passed} passed, ${failed} failed`);
+    if (failed > 0) process.exit(1);
+  });
 }
 
 runTests();

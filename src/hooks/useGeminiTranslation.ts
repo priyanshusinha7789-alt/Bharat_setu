@@ -1,11 +1,18 @@
 import { useState, useCallback, useRef } from 'react';
 
+export interface VisualMetadata {
+  visualType: 'plant_growth' | 'water_cycle' | 'triangle_geometry' | 'circle_geometry' | 'solar_system' | 'animal_nature' | 'counting_math' | 'classroom_chat' | 'pedagogy_concept';
+  conceptTitle: string;
+  keyElements: string[];
+}
+
 export interface TranslationResult {
   translation: string;
   phonetic?: string;
   detectedSource?: string;
   pedagogicalNote?: string;
   targetLanguage: string;
+  visual?: VisualMetadata;
 }
 
 export function useGeminiTranslation() {
@@ -61,7 +68,8 @@ export function useGeminiTranslation() {
             phonetic: data.phonetic,
             detectedSource: data.detectedSource,
             pedagogicalNote: data.pedagogicalNote,
-            targetLanguage: data.targetLanguage
+            targetLanguage: data.targetLanguage,
+            visual: data.visual
           });
           setErrorMessage(null);
           setErrorCode(null);
