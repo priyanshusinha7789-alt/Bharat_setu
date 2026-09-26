@@ -92,23 +92,31 @@ OUTPUT FORMAT: Return ONLY valid, raw JSON (no markdown formatting, no code fenc
   "pedagogicalNote": "short note for primary school teaching context"
 }`;
 
-    // Call Gemini 2.5 Flash (with fallback to gemini-1.5-flash if needed)
+    // Call Gemini 3.8 Flash (with fallback to gemini-2.0-flash / gemini-1.5-flash if needed)
     let response;
     try {
       response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3.8-flash',
         contents: [
           { role: 'user', parts: [{ text: `${systemPrompt}\n\nUSER INPUT TO TRANSLATE:\n"${text.trim()}"` }] }
         ]
       });
-    } catch (modelErr: any) {
-      // Fallback model attempt
-      response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
-        contents: [
-          { role: 'user', parts: [{ text: `${systemPrompt}\n\nUSER INPUT TO TRANSLATE:\n"${text.trim()}"` }] }
-        ]
-      });
+    } catch {
+      try {
+        response = await ai.models.generateContent({
+          model: 'gemini-2.0-flash',
+          contents: [
+            { role: 'user', parts: [{ text: `${systemPrompt}\n\nUSER INPUT TO TRANSLATE:\n"${text.trim()}"` }] }
+          ]
+        });
+      } catch {
+        response = await ai.models.generateContent({
+          model: 'gemini-1.5-flash',
+          contents: [
+            { role: 'user', parts: [{ text: `${systemPrompt}\n\nUSER INPUT TO TRANSLATE:\n"${text.trim()}"` }] }
+          ]
+        });
+      }
     }
 
     const rawOutput = response.text?.trim() || '';

@@ -38,11 +38,11 @@ function bhashaSetuApiPlugin(): Plugin {
                 sourceLanguageHint: body.sourceLanguageHint
               });
 
-              res.setHeader('Content-Type', 'application/json');
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
               res.statusCode = result.success ? 200 : (result.errorCode === 'MISSING_API_KEY' ? 400 : 500);
               res.end(JSON.stringify(result));
             } catch (err: any) {
-              res.setHeader('Content-Type', 'application/json');
+              res.setHeader('Content-Type', 'application/json; charset=utf-8');
               res.statusCode = 500;
               res.end(JSON.stringify({
                 success: false,
