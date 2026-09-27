@@ -1,0 +1,14 @@
+services:
+  bhasha-setu:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bhasha-setu
+    ports:
+      - "5173:5173"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
