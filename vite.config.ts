@@ -66,6 +66,7 @@ export default defineConfig({
   plugins: [react(), bhashaSetuApiPlugin()],
   server: {
     port: 5173,
-    host: true
+    host: true,
+    allowedHosts: ['heavy-parents-sniff.loca.lt']
   }
 });
