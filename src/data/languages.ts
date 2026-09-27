@@ -50,8 +50,8 @@ export const LANGUAGES: LanguageInfo[] = [
   {
     id: 'ho',
     name: 'Ho',
-    nativeName: 'Warang Citi / ᱦᱳ',
-    script: 'Warang Citi',
+    nativeName: '𑢹𑣉 (Ho) / ᱦᱳ',
+    script: 'Warang Citi (Varang Kshiti)',
     region: 'Kolhan division: West Singhbhum, Chaibasa',
     status: 'pending_validation',
     statusLabel: 'Awaiting Community Validation',

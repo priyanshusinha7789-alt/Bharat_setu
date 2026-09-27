@@ -157,3 +157,31 @@ a:focus-visible, button:focus-visible, select:focus-visible, textarea:focus-visi
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* Responsive Grid for Languages Showcase: 3 cols desktop, 2 cols tablet, 1 col mobile */
+.languages-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px;
+}
+
+@media (max-width: 1024px) {
+  .languages-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+}
+
+@media (max-width: 640px) {
+  .languages-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+/* Vernacular script typography with comprehensive Unicode fallback chain */
+.vernacular-text {
+  font-family: 'Noto Sans Warang Citi', 'Noto Sans Ol Chiki', 'Noto Sans Devanagari', 'Noto Sans Bengali', 'Nirmala UI', 'Segoe UI Historic', 'Arial Unicode MS', sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}

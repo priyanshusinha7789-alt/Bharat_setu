@@ -26,7 +26,7 @@ export const LanguageShowcase: React.FC = () => {
           }}>
             <GlobeIcon size={16} /> Jharkhand Linguistic Landscape
           </div>
-          <h2 style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: 'clamp(1.8rem, 3.5vw, 2.5rem)', marginBottom: '1rem', color: '#ffffff' }}>
             Supported Regional & Tribal Mother Tongues
           </h2>
           <p style={{ color: '#94a3b8', fontSize: '1rem', lineHeight: 1.6 }}>
@@ -34,14 +34,14 @@ export const LanguageShowcase: React.FC = () => {
           </p>
         </div>
 
-        {/* 6 Language Cards */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '20px'
-        }}>
+        {/* 6 Language Cards: 3 columns desktop, 2 columns tablet, 1 column mobile */}
+        <div className="languages-grid">
           {LANGUAGES.map((lang) => {
             const isVerified = lang.status === 'verified';
+            const classification = (lang.id === 'hindi' || lang.id === 'bengali')
+              ? 'Constitutional'
+              : 'Indigenous Mother Tongue';
+
             return (
               <div
                 key={lang.id}
@@ -51,25 +51,35 @@ export const LanguageShowcase: React.FC = () => {
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  borderLeft: `4px solid ${isVerified ? '#10b981' : '#eab308'}`
+                  borderLeft: `4px solid ${isVerified ? '#10b981' : '#eab308'}`,
+                  height: '100%',
+                  borderRadius: '14px',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.25)'
                 }}
               >
                 <div>
-                  {/* Card Title & Status Badge */}
+                  {/* Top Metadata Row: Classification Tag & Status Badge */}
                   <div style={{
                     display: 'flex',
-                    alignItems: 'flex-start',
+                    alignItems: 'center',
                     justifyContent: 'space-between',
-                    marginBottom: '12px'
+                    gap: '8px',
+                    marginBottom: '14px',
+                    flexWrap: 'wrap'
                   }}>
-                    <div>
-                      <h3 style={{ fontSize: '1.25rem', marginBottom: '2px' }}>
-                        {lang.name}
-                      </h3>
-                      <div style={{ fontSize: '0.95rem', color: '#38bdf8', fontWeight: 600 }}>
-                        {lang.nativeName}
-                      </div>
-                    </div>
+                    <span style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 700,
+                      color: '#38bdf8',
+                      backgroundColor: 'rgba(56, 189, 248, 0.08)',
+                      border: '1px solid rgba(56, 189, 248, 0.25)',
+                      padding: '3px 10px',
+                      borderRadius: '6px',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em'
+                    }}>
+                      {classification}
+                    </span>
 
                     <span style={{
                       fontSize: '0.72rem',
@@ -78,53 +88,95 @@ export const LanguageShowcase: React.FC = () => {
                       borderRadius: '999px',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '4px',
-                      backgroundColor: isVerified ? 'rgba(16, 185, 129, 0.15)' : 'rgba(234, 179, 8, 0.15)',
+                      gap: '5px',
+                      backgroundColor: isVerified ? 'rgba(16, 185, 129, 0.14)' : 'rgba(234, 179, 8, 0.14)',
                       color: isVerified ? '#34d399' : '#fde047',
-                      border: `1px solid ${isVerified ? '#059669' : '#ca8a04'}`
+                      border: `1px solid ${isVerified ? '#059669' : '#ca8a04'}`,
+                      whiteSpace: 'nowrap'
                     }}>
                       {isVerified ? <CheckCircleIcon size={12} /> : <AlertCircleIcon size={12} />}
                       {lang.statusLabel}
                     </span>
                   </div>
 
-                  {/* Metadata fields */}
-                  <div style={{
-                    backgroundColor: '#0a0f1d',
-                    borderRadius: '8px',
-                    padding: '10px 12px',
-                    marginBottom: '14px',
-                    fontSize: '0.82rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '6px'
-                  }}>
-                    <div>
-                      <strong style={{ color: '#cbd5e1' }}>Traditional Script: </strong>
-                      <span style={{ color: '#94a3b8' }}>{lang.script}</span>
-                    </div>
-                    <div>
-                      <strong style={{ color: '#cbd5e1' }}>Primary Districts: </strong>
-                      <span style={{ color: '#94a3b8' }}>{lang.region}</span>
+                  {/* Primary Language Name & Native Script Display */}
+                  <div style={{ marginBottom: '14px' }}>
+                    <h3 style={{
+                      fontSize: '1.35rem',
+                      fontWeight: 800,
+                      color: '#ffffff',
+                      marginBottom: '4px',
+                      lineHeight: 1.2
+                    }}>
+                      {lang.name}
+                    </h3>
+                    <div
+                      className="vernacular-text"
+                      style={{
+                        fontSize: '1.05rem',
+                        fontWeight: 600,
+                        color: '#38bdf8',
+                        lineHeight: 1.45,
+                        wordBreak: 'break-word'
+                      }}
+                    >
+                      {lang.nativeName}
                     </div>
                   </div>
 
-                  {/* Cultural note */}
-                  <p style={{ fontSize: '0.86rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+                  {/* Metadata Fields: Traditional Script & Primary Districts */}
+                  <div style={{
+                    backgroundColor: '#0a0f1d',
+                    border: '1px solid rgba(255, 255, 255, 0.06)',
+                    borderRadius: '10px',
+                    padding: '12px 14px',
+                    marginBottom: '14px',
+                    fontSize: '0.84rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ color: '#cbd5e1', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Traditional Script
+                      </span>
+                      <span className="vernacular-text" style={{ color: '#e2e8f0', lineHeight: 1.4, fontSize: '0.88rem' }}>
+                        {lang.script}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <span style={{ color: '#cbd5e1', fontWeight: 600, fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        Primary Districts
+                      </span>
+                      <span style={{ color: '#94a3b8', lineHeight: 1.45, fontSize: '0.84rem' }}>
+                        {lang.region}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Cultural and Pedagogical Note */}
+                  <p style={{
+                    fontSize: '0.86rem',
+                    color: '#94a3b8',
+                    lineHeight: 1.6,
+                    margin: 0
+                  }}>
                     {lang.culturalNote}
                   </p>
                 </div>
 
-                {/* Bottom status note */}
+                {/* Bottom Verification Footer */}
                 <div style={{
                   marginTop: '16px',
                   paddingTop: '12px',
                   borderTop: '1px solid #1e293b',
-                  fontSize: '0.75rem',
+                  fontSize: '0.76rem',
+                  fontWeight: 600,
                   color: isVerified ? '#34d399' : '#eab308',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '6px'
+                  gap: '6px',
+                  lineHeight: 1.4
                 }}>
                   {isVerified ? (
                     <>✓ Active in prototype dictionary with TTS synthesis</>
