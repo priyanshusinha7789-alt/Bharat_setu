@@ -1,8 +1,8 @@
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
-import { geminiKeyManager, GeminiKeyManager } from './geminiKeyManager';
-import { requestQueue, RequestQueue } from './requestQueue';
-import { detectVisualFallback, VisualMetadata } from '../data/visualDetector';
+import { geminiKeyManager, GeminiKeyManager } from './geminiKeyManager.js';
+import { requestQueue, RequestQueue } from './requestQueue.js';
+import { detectVisualFallback, VisualMetadata } from '../data/visualDetector.js';
 
 // Ensure .env is loaded
 dotenv.config();

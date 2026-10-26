@@ -1,4 +1,4 @@
-import { translateWithGemini } from '../src/server/translateService';
+import { translateWithGemini } from '../src/server/translateService.js';
 
 export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');

@@ -1,4 +1,4 @@
-import { geminiKeyManager } from '../src/server/geminiKeyManager';
+import { geminiKeyManager } from '../src/server/geminiKeyManager.js';
 
 export default function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Origin', '*');
