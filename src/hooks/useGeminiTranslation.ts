@@ -1,10 +1,9 @@
 import { useState, useCallback, useRef } from 'react';
+import { findTranslation } from '../data/translations';
+import { detectVisualFallback, VisualMetadata } from '../data/visualDetector';
+import { LanguageId } from '../types';
 
-export interface VisualMetadata {
-  visualType: 'plant_growth' | 'water_cycle' | 'triangle_geometry' | 'circle_geometry' | 'solar_system' | 'animal_nature' | 'counting_math' | 'classroom_chat' | 'pedagogy_concept';
-  conceptTitle: string;
-  keyElements: string[];
-}
+export type { VisualMetadata };
 
 export interface TranslationResult {
   translation: string;
@@ -13,6 +12,8 @@ export interface TranslationResult {
   pedagogicalNote?: string;
   targetLanguage: string;
   visual?: VisualMetadata;
+  modelUsed?: string;
+  keyId?: string;
 }
 
 export function useGeminiTranslation() {
@@ -20,6 +21,8 @@ export function useGeminiTranslation() {
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
+  const [retryAfterSeconds, setRetryAfterSeconds] = useState<number | null>(null);
+  const [quotaType, setQuotaType] = useState<'daily' | 'rpm' | 'tpm' | 'unknown' | null>(null);
   const activeRequestRef = useRef<AbortController | null>(null);
 
   const translate = useCallback(
@@ -28,8 +31,13 @@ export function useGeminiTranslation() {
         setResult(null);
         setErrorMessage(null);
         setErrorCode(null);
+        setRetryAfterSeconds(null);
+        setQuotaType(null);
         return;
       }
+
+      // Check offline verified curriculum sample fallback first for immediate resilience
+      const offlineSample = findTranslation(text, targetLanguage as LanguageId);
 
       // Cancel any ongoing fetch
       if (activeRequestRef.current) {
@@ -41,6 +49,8 @@ export function useGeminiTranslation() {
       setIsLoading(true);
       setErrorMessage(null);
       setErrorCode(null);
+      setRetryAfterSeconds(null);
+      setQuotaType(null);
 
       try {
         const response = await fetch('/api/translate', {
@@ -54,13 +64,59 @@ export function useGeminiTranslation() {
           signal: abortController.signal
         });
 
-        const data = await response.json();
+        // If response is not JSON (e.g. HTML 404 on static deployment)
+        const contentType = response.headers.get('content-type') || '';
+        let data: any = null;
+        if (contentType.includes('application/json')) {
+          data = await response.json();
+        } else {
+          // If non-JSON received (e.g. 404 from host without serverless functions)
+          if (offlineSample.found) {
+            const visual = detectVisualFallback(text, offlineSample.translationText);
+            setResult({
+              translation: offlineSample.translationText,
+              phonetic: undefined,
+              detectedSource: 'Curriculum Sample',
+              pedagogicalNote: offlineSample.note || 'Verified primary curriculum translation from Bhasha Setu pedagogy database.',
+              targetLanguage,
+              visual,
+              modelUsed: 'Curriculum Sample (Verified Offline)'
+            });
+            setErrorMessage(null);
+            setErrorCode(null);
+            return;
+          }
+
+          setErrorCode('API_ERROR');
+          setErrorMessage('API endpoint /api/translate is not configured on this host. Please verify serverless API deployment and GEMINI_API_KEY.');
+          setResult(null);
+          return;
+        }
 
         if (!response.ok || !data.success) {
+          // If API call failed, but text is a curriculum sample sentence, fall back to offline sample
+          if (offlineSample.found) {
+            const visual = detectVisualFallback(text, offlineSample.translationText);
+            setResult({
+              translation: offlineSample.translationText,
+              phonetic: undefined,
+              detectedSource: 'Curriculum Sample',
+              pedagogicalNote: offlineSample.note || 'Verified primary curriculum translation from Bhasha Setu pedagogy database.',
+              targetLanguage,
+              visual,
+              modelUsed: 'Curriculum Sample (Verified Offline)'
+            });
+            setErrorMessage(null);
+            setErrorCode(null);
+            return;
+          }
+
           setErrorCode(data.errorCode || 'API_ERROR');
           setErrorMessage(
             data.error || 'Translation request failed. Please check backend service and API key.'
           );
+          setRetryAfterSeconds(data.retryAfterSeconds || null);
+          setQuotaType(data.quotaType || null);
           setResult(null);
         } else {
           setResult({
@@ -69,13 +125,35 @@ export function useGeminiTranslation() {
             detectedSource: data.detectedSource,
             pedagogicalNote: data.pedagogicalNote,
             targetLanguage: data.targetLanguage,
-            visual: data.visual
+            visual: data.visual,
+            modelUsed: data.modelUsed,
+            keyId: data.keyId
           });
           setErrorMessage(null);
           setErrorCode(null);
+          setRetryAfterSeconds(null);
+          setQuotaType(null);
         }
       } catch (err: any) {
         if (err.name === 'AbortError') return;
+
+        // If network error occurred, but text is a curriculum sample sentence, fall back to offline sample
+        if (offlineSample.found) {
+          const visual = detectVisualFallback(text, offlineSample.translationText);
+          setResult({
+            translation: offlineSample.translationText,
+            phonetic: undefined,
+            detectedSource: 'Curriculum Sample',
+            pedagogicalNote: offlineSample.note || 'Verified primary curriculum translation from Bhasha Setu pedagogy database.',
+            targetLanguage,
+            visual,
+            modelUsed: 'Curriculum Sample (Verified Offline)'
+          });
+          setErrorMessage(null);
+          setErrorCode(null);
+          return;
+        }
+
         setErrorCode('NETWORK_ERROR');
         setErrorMessage('Could not connect to translation backend. Please ensure the server is running.');
         setResult(null);
@@ -90,6 +168,8 @@ export function useGeminiTranslation() {
     setResult(null);
     setErrorMessage(null);
     setErrorCode(null);
+    setRetryAfterSeconds(null);
+    setQuotaType(null);
   }, []);
 
   return {
@@ -98,6 +178,8 @@ export function useGeminiTranslation() {
     result,
     errorMessage,
     errorCode,
+    retryAfterSeconds,
+    quotaType,
     clearTranslation
   };
 }

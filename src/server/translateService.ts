@@ -1,5 +1,8 @@
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import { geminiKeyManager, GeminiKeyManager } from './geminiKeyManager';
+import { requestQueue, RequestQueue } from './requestQueue';
+import { detectVisualFallback, VisualMetadata } from '../data/visualDetector';
 
 // Ensure .env is loaded
 dotenv.config();
@@ -10,11 +13,7 @@ export interface TranslationRequest {
   sourceLanguageHint?: string;
 }
 
-export interface VisualMetadata {
-  visualType: 'plant_growth' | 'water_cycle' | 'triangle_geometry' | 'circle_geometry' | 'solar_system' | 'animal_nature' | 'counting_math' | 'classroom_chat' | 'pedagogy_concept';
-  conceptTitle: string;
-  keyElements: string[];
-}
+export type { VisualMetadata };
 
 export interface TranslationResponse {
   success: boolean;
@@ -24,9 +23,20 @@ export interface TranslationResponse {
   pedagogicalNote?: string;
   targetLanguage: string;
   modelUsed?: string;
+  keyId?: string;
   visual?: VisualMetadata;
   error?: string;
   errorCode?: 'MISSING_API_KEY' | 'API_ERROR' | 'UNSUPPORTED_LANGUAGE' | 'INVALID_INPUT' | 'QUOTA_EXCEEDED';
+  quotaType?: 'daily' | 'rpm' | 'tpm' | 'unknown';
+  retryAfterSeconds?: number;
+}
+
+export interface TranslationExecutionOptions {
+  mockExecutor?: (apiKey: string, model: string, prompt: string) => Promise<any>;
+  keyManager?: GeminiKeyManager;
+  maxTransientRetries?: number;
+  initialBackoffMs?: number;
+  skipQueue?: boolean;
 }
 
 const LANGUAGE_METADATA: Record<string, { name: string; script: string; family: string }> = {
@@ -38,8 +48,14 @@ const LANGUAGE_METADATA: Record<string, { name: string; script: string; family: 
   kurukh: { name: 'Kurukh (Oraon)', script: 'Tolong Siki / Devanagari', family: 'Dravidian' }
 };
 
-export async function translateWithGemini(req: TranslationRequest): Promise<TranslationResponse> {
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export async function translateWithGemini(
+  req: TranslationRequest,
+  options?: TranslationExecutionOptions
+): Promise<TranslationResponse> {
   const { text, targetLanguage, sourceLanguageHint } = req;
+  const km = options?.keyManager || geminiKeyManager;
 
   if (!text || !text.trim()) {
     return {
@@ -48,17 +64,6 @@ export async function translateWithGemini(req: TranslationRequest): Promise<Tran
       targetLanguage,
       error: 'Input text is empty. Please enter or speak a sentence to translate.',
       errorCode: 'INVALID_INPUT'
-    };
-  }
-
-  const apiKey = process.env.GEMINI_API_KEY?.trim();
-  if (!apiKey) {
-    return {
-      success: false,
-      translation: '',
-      targetLanguage,
-      error: 'GEMINI_API_KEY is not configured on the server. Please add your Gemini API key to the .env file in the project directory.',
-      errorCode: 'MISSING_API_KEY'
     };
   }
 
@@ -73,8 +78,50 @@ export async function translateWithGemini(req: TranslationRequest): Promise<Tran
     };
   }
 
-  try {
-    const ai = new GoogleGenAI({ apiKey });
+  // Check if any keys are configured in pool
+  if (!km.hasKeys()) {
+    return {
+      success: false,
+      translation: '',
+      targetLanguage,
+      error: 'No Gemini API keys are configured on the server. Please add GEMINI_API_KEY_1 (or GEMINI_API_KEY) to your .env file.',
+      errorCode: 'MISSING_API_KEY'
+    };
+  }
+
+  // Deduplication & queueing wrapper
+  const cacheKey = RequestQueue.makeKey(text, targetLanguage, sourceLanguageHint);
+
+  const executeCore = async (): Promise<TranslationResponse> => {
+    // Get available active or recovered keys
+    const availableKeys = km.getAvailableKeys();
+    if (availableKeys.length === 0) {
+      if (km.isDailyQuotaExhaustedPool()) {
+        return {
+          success: false,
+          translation: '',
+          targetLanguage,
+          error: 'Daily Gemini API request quota exhausted for this Google Cloud project (free-tier limit: 20 requests/day for gemini-3.8-flash). Please wait for the daily quota reset at midnight Pacific Time, check usage at https://ai.dev/rate-limit, or configure an API key from an independent Google Cloud project.',
+          errorCode: 'QUOTA_EXCEEDED',
+          quotaType: 'daily'
+        };
+      }
+
+      const shortestCooldown = km.getShortestRemainingCooldownSeconds();
+      const waitMsg = shortestCooldown > 0
+        ? `All configured Gemini API keys are currently rate-limited (429 / RPM). Automatic recovery in ~${shortestCooldown}s.`
+        : 'All configured Gemini API keys are exhausted or quarantined. Please check server keys and quotas.';
+
+      return {
+        success: false,
+        translation: '',
+        targetLanguage,
+        error: waitMsg,
+        errorCode: 'QUOTA_EXCEEDED',
+        quotaType: 'rpm',
+        retryAfterSeconds: shortestCooldown > 0 ? shortestCooldown : 30
+      };
+    }
 
     const systemPrompt = `You are BHASHA SETU (भाषा सेतु), an AI-Powered Vernacular Pedagogy and Real-Time Translation engine built for primary-school education in multilingual communities in Jharkhand, India.
 
@@ -97,7 +144,7 @@ INSTRUCTIONS:
    - "triangle_geometry": triangle, 3 sides, geometry, polygons, shapes
    - "circle_geometry": circles, round shapes, wheels, spheres
    - "solar_system": sun, moon, stars, planets, sky, day and night
-   - "animal_nature": animals, birds, insects, wildlife, nature
+   - "animal_nature": animal, birds, insects, wildlife, nature
    - "counting_math": numbers, counting, arithmetic, math concepts
    - "classroom_chat": greetings, dialogue, conversational speech, Hinglish/slang chat
    - "pedagogy_concept": general school learning, books, science, knowledge
@@ -115,50 +162,153 @@ OUTPUT FORMAT: Return ONLY valid, raw JSON (no markdown formatting, no code fenc
   }
 }`;
 
-    // Models to try in order of priority:
-    // 1. Primary requested: gemini-3.8-flash
-    // 2. Verified active fallbacks supported by this API key: gemini-3.5-flash, gemini-3.5-flash-lite, gemini-3.1-flash-lite
-    const modelsToTry = [
-      'gemini-3.8-flash',
-      'gemini-3.5-flash',
-      'gemini-3.5-flash-lite',
-      'gemini-3.1-flash-lite'
-    ];
+    const prompt = `${systemPrompt}\n\nUSER INPUT TO TRANSLATE:\n"${text.trim()}"`;
+    const models = km.getModels();
+    const maxTransientRetries = options?.maxTransientRetries ?? 2;
+    const initialBackoffMs = options?.initialBackoffMs ?? 200;
 
     let response: any = null;
     let modelUsed = '';
-    let lastError: any = null;
+    let successfulKeyId = '';
+    let lastErrorCategory: any = null;
 
-    for (const model of modelsToTry) {
-      try {
-        response = await ai.models.generateContent({
-          model,
-          contents: [
-            { role: 'user', parts: [{ text: `${systemPrompt}\n\nUSER INPUT TO TRANSLATE:\n"${text.trim()}"` }] }
-          ]
-        });
-        modelUsed = model;
-        break; // Successfully got response, stop trying fallbacks
-      } catch (err: any) {
-        lastError = err;
-        // Proceed to next fallback model
+    // Key Failover Loop: Iterate through available keys
+    for (let keyIdx = 0; keyIdx < availableKeys.length; keyIdx++) {
+      const keyEntry = availableKeys[keyIdx];
+      let keyShouldBeSkipped = false;
+
+      // Model Hierarchy: gemini-3.8-flash -> gemini-3.5-flash -> gemini-3.5-flash-lite -> gemini-3.1-flash-lite
+      for (const model of models) {
+        if (keyShouldBeSkipped) break;
+
+        // Bounded retry loop with exponential backoff and random jitter
+        let retryCount = 0;
+        while (retryCount <= maxTransientRetries) {
+          try {
+            if (options?.mockExecutor) {
+              response = await options.mockExecutor(keyEntry.key, model, prompt);
+            } else {
+              const ai = new GoogleGenAI({ apiKey: keyEntry.key });
+              response = await ai.models.generateContent({
+                model,
+                contents: [{ role: 'user', parts: [{ text: prompt }] }]
+              });
+            }
+
+            modelUsed = model;
+            successfulKeyId = keyEntry.id;
+            km.markSuccess(keyEntry.id);
+            break; // Succeeded!
+          } catch (err: any) {
+            const categorized = GeminiKeyManager.categorizeError(err);
+            lastErrorCategory = categorized;
+
+            if (categorized.type === 'daily_quota') {
+              // Daily quota exhausted: Record daily state, do not retry this key
+              km.markRateLimited(keyEntry.id, undefined, {
+                quotaType: 'daily',
+                quotaId: categorized.quotaId,
+                projectId: categorized.projectId
+              });
+              keyShouldBeSkipped = true;
+              break;
+            }
+
+            if (categorized.type === 'rate_limit') {
+              // RPM rate-limit: Mark rate-limited with parsed retry delay + jitter, failover to next key
+              const jitterMs = Math.floor(Math.random() * 2000);
+              const customDelay = categorized.retryAfterMs ? categorized.retryAfterMs + jitterMs : undefined;
+              km.markRateLimited(keyEntry.id, customDelay, {
+                quotaType: categorized.quotaType || 'rpm',
+                quotaId: categorized.quotaId,
+                projectId: categorized.projectId
+              });
+              keyShouldBeSkipped = true;
+              break;
+            }
+
+            if (categorized.type === 'invalid_key') {
+              // 401: Quarantine key permanently
+              km.markInvalid(keyEntry.id, categorized.message);
+              keyShouldBeSkipped = true;
+              break;
+            }
+
+            if (categorized.type === 'permission_denied') {
+              // 403: Quarantine key permanently
+              km.markPermissionDenied(keyEntry.id, categorized.message);
+              keyShouldBeSkipped = true;
+              break;
+            }
+
+            if (categorized.type === 'transient_server') {
+              // 5xx / Network timeout: Retry with bounded exponential backoff with jitter
+              retryCount++;
+              if (retryCount <= maxTransientRetries) {
+                const jitter = Math.floor(Math.random() * 100);
+                const backoff = initialBackoffMs * Math.pow(2, retryCount - 1) + jitter;
+                console.warn(
+                  `[BHASHA SETU Auth] Transient error (${model}, ${keyEntry.id}). Retrying in ${backoff}ms (attempt ${retryCount}/${maxTransientRetries})...`
+                );
+                await sleep(backoff);
+                continue;
+              } else {
+                break;
+              }
+            }
+
+            // Other error (e.g. model not supported by key): Try next model
+            break;
+          }
+        }
+
+        if (response && modelUsed) break;
       }
+
+      if (response && modelUsed) break;
     }
 
     if (!response || !modelUsed) {
-      throw lastError || new Error('All translation models in the fallback chain failed.');
+      if (km.isDailyQuotaExhaustedPool() || lastErrorCategory?.type === 'daily_quota') {
+        return {
+          success: false,
+          translation: '',
+          targetLanguage,
+          error: 'Daily Gemini API request quota exhausted for this Google Cloud project (free-tier limit: 20 requests/day for gemini-3.8-flash). Please wait for the daily quota reset at midnight Pacific Time, check usage at https://ai.dev/rate-limit, or configure an API key from an independent Google Cloud project.',
+          errorCode: 'QUOTA_EXCEEDED',
+          quotaType: 'daily'
+        };
+      }
+
+      const shortestCooldown = km.getShortestRemainingCooldownSeconds();
+      if (lastErrorCategory?.type === 'rate_limit' || shortestCooldown > 0) {
+        return {
+          success: false,
+          translation: '',
+          targetLanguage,
+          error: `All available Gemini API keys have exceeded their requests-per-minute rate limits. Please retry in ~${shortestCooldown || 30} seconds.`,
+          errorCode: 'QUOTA_EXCEEDED',
+          quotaType: 'rpm',
+          retryAfterSeconds: shortestCooldown || 30
+        };
+      }
+
+      return {
+        success: false,
+        translation: '',
+        targetLanguage,
+        error: `Gemini translation service unavailable. ${lastErrorCategory?.message || 'All keys and fallback models failed.'}`,
+        errorCode: 'API_ERROR'
+      };
     }
 
-    const rawOutput = response.text?.trim() || '';
-    
-    // Parse JSON safely
+    // Parse response
+    const rawOutput = (typeof response === 'string' ? response : (response.text?.trim() || '')).trim();
     let parsed: any;
     try {
-      // Remove any surrounding code fences if model included them
       const cleanJson = rawOutput.replace(/^```json\s*/i, '').replace(/^```\s*/, '').replace(/\s*```$/, '').trim();
       parsed = JSON.parse(cleanJson);
     } catch {
-      // If output is not pure JSON, use text directly
       parsed = {
         translation: rawOutput,
         detectedSource: 'Auto-detected',
@@ -166,7 +316,6 @@ OUTPUT FORMAT: Return ONLY valid, raw JSON (no markdown formatting, no code fenc
       };
     }
 
-    // Determine visual metadata, falling back to semantic keyword detection if omitted
     const visual = parsed.visual && parsed.visual.visualType
       ? parsed.visual
       : detectVisualFallback(text, parsed.translation);
@@ -179,110 +328,17 @@ OUTPUT FORMAT: Return ONLY valid, raw JSON (no markdown formatting, no code fenc
       pedagogicalNote: parsed.pedagogicalNote || undefined,
       targetLanguage,
       modelUsed,
+      keyId: successfulKeyId,
       visual
     };
-  } catch (err: any) {
-    const errorStr = String(err?.message || err);
-    let userFriendlyMsg = 'Gemini translation request failed. Please check your network connection and API key.';
-    let errorCode: TranslationResponse['errorCode'] = 'API_ERROR';
-
-    if (errorStr.includes('API_KEY_INVALID') || errorStr.includes('invalid api key') || errorStr.includes('401')) {
-      userFriendlyMsg = 'Invalid Gemini API Key. Please verify the GEMINI_API_KEY in your .env file.';
-      errorCode = 'API_ERROR';
-    } else if (errorStr.includes('RESOURCE_EXHAUSTED') || errorStr.includes('429') || errorStr.includes('Quota exceeded')) {
-      userFriendlyMsg = 'Gemini API quota exceeded for your project. Please check your quota at https://ai.dev/rate-limit or retry in a few moments.';
-      errorCode = 'QUOTA_EXCEEDED';
-    } else if (errorStr.includes('PERMISSION_DENIED') || errorStr.includes('403')) {
-      userFriendlyMsg = 'Permission denied for this Gemini API key. Ensure the Generative Language API is enabled.';
-      errorCode = 'API_ERROR';
-    } else if (errorStr.includes('FETCH_ERROR') || errorStr.includes('ENOTFOUND')) {
-      userFriendlyMsg = 'Network connectivity error reaching Google Gemini API. Please check your internet connection.';
-      errorCode = 'API_ERROR';
-    }
-
-    return {
-      success: false,
-      translation: '',
-      targetLanguage,
-      error: userFriendlyMsg,
-      errorCode
-    };
-  }
-}
-
-/**
- * Fallback semantic classifier to select appropriate visual illustration for primary students
- */
-export function detectVisualFallback(sourceText: string, translatedText: string = ''): VisualMetadata {
-  const combined = (sourceText + ' ' + translatedText).toLowerCase();
-
-  if (/\b(vapour|vapor|steam|heated|boil|boiling|evaporat|वाष्प|भाप|गरम करने|বাষ্প|জল বাষ্প)\b/i.test(combined)) {
-    return {
-      visualType: 'water_cycle',
-      conceptTitle: 'Evaporation & States of Matter',
-      keyElements: ['Liquid water', 'Thermal heating', 'Ascending vapour particles']
-    };
-  }
-
-  if (/\b(plant|plants|leaf|leaves|sunlight|photosynthesis|tree|trees|seed|sprout|soil|पौध|पेड़|पत्त|धूप|झाड़|গাছ|পাতা)\b/i.test(combined)) {
-    return {
-      visualType: 'plant_growth',
-      conceptTitle: 'Plant Photosynthesis & Growth',
-      keyElements: ['Sunlight energy', 'Water absorption', 'Plant food preparation']
-    };
-  }
-
-  if (/\b(triangle|three sides|3 sides|angle|angles|polygon|corner|त्रिभुज|भुजा|कोन|त्रिकोण|ত্রিভুজ|বাহু)\b/i.test(combined)) {
-    return {
-      visualType: 'triangle_geometry',
-      conceptTitle: 'Triangle Geometry & Sides',
-      keyElements: ['Side 1 (Base)', 'Side 2 (Left)', 'Side 3 (Right)']
-    };
-  }
-
-  if (/\b(circle|round|wheel|sphere|circular|perimeter|radius|गोल|वृत्त|चक्र|বৃত্ত)\b/i.test(combined)) {
-    return {
-      visualType: 'circle_geometry',
-      conceptTitle: 'Circular Geometry & Shapes',
-      keyElements: ['Center point', 'Continuous curved perimeter', 'Radius distance']
-    };
-  }
-
-  if (/\b(sun|moon|star|stars|planet|space|sky|orbit|day|night|चाँद|तारे|आसमान|सूर्य|ग्रह)\b/i.test(combined)) {
-    return {
-      visualType: 'solar_system',
-      conceptTitle: 'Planets & Celestial Motion',
-      keyElements: ['Central Sun', 'Orbital path', 'Atmospheric cycle']
-    };
-  }
-
-  if (/\b(animal|bird|cat|dog|fish|cow|lion|forest|creature|जानवर|पशु|पक्षी|चिड़िया)\b/i.test(combined)) {
-    return {
-      visualType: 'animal_nature',
-      conceptTitle: 'Living Animals & Nature',
-      keyElements: ['Natural habitat', 'Living creature', 'Ecosystem link']
-    };
-  }
-
-  if (/\b(count|number|numbers|one|two|three|four|five|ten|plus|minus|math|maths|add|गिन|संख्या|जोड़|अंक)\b/i.test(combined)) {
-    return {
-      visualType: 'counting_math',
-      conceptTitle: 'Foundational Counting & Numbers',
-      keyElements: ['Numeral symbols', 'Visual token counting', 'Equivalence balance']
-    };
-  }
-
-  if (/\b(hello|hi|namaste|kem cho|kasa|kaise|kya|bhai|yaar|friend|dost|talk|listen|bol|suno|सुनो|नमस्ते|কেমন)\b/i.test(combined)) {
-    return {
-      visualType: 'classroom_chat',
-      conceptTitle: 'Classroom Dialogue & Expression',
-      keyElements: ['Teacher expression', 'Mother tongue translation', 'Student comprehension']
-    };
-  }
-
-  return {
-    visualType: 'pedagogy_concept',
-    conceptTitle: 'Curricular Concept Learning',
-    keyElements: ['Concept definition', 'Vernacular context', 'Primary explanation']
   };
+
+  // Run through request queue for concurrency limiting and deduplication (unless explicitly skipped in testing)
+  if (options?.skipQueue) {
+    return executeCore();
+  }
+
+  return requestQueue.execute(cacheKey, executeCore);
 }
+
+export { detectVisualFallback };

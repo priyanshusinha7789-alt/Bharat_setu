@@ -48,8 +48,31 @@ export const ClassroomConsole: React.FC = () => {
     result: aiResult,
     errorMessage: aiError,
     errorCode: aiErrorCode,
+    retryAfterSeconds: aiRetryAfterSeconds,
+    quotaType: aiQuotaType,
     clearTranslation
   } = useGeminiTranslation();
+
+  const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (aiRetryAfterSeconds && aiRetryAfterSeconds > 0 && aiQuotaType !== 'daily') {
+      setRetryCountdown(aiRetryAfterSeconds);
+    } else {
+      setRetryCountdown(null);
+    }
+  }, [aiRetryAfterSeconds, aiQuotaType]);
+
+  useEffect(() => {
+    if (retryCountdown === null || retryCountdown <= 0) return;
+    const interval = setInterval(() => {
+      setRetryCountdown((prev) => {
+        if (prev === null || prev <= 1) return null;
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [retryCountdown]);
 
   // Custom hooks
   const {
@@ -154,7 +177,7 @@ export const ClassroomConsole: React.FC = () => {
 
   // Manual trigger for typed translation
   const handleManualTranslate = () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || isTranslating || (retryCountdown !== null && retryCountdown > 0)) return;
     executeTranslation(inputText, selectedLanguage, selectedSourceLang);
   };
 
@@ -542,24 +565,30 @@ export const ClassroomConsole: React.FC = () => {
               <div style={{ marginTop: '10px' }}>
                 <button
                   onClick={handleManualTranslate}
-                  disabled={isTranslating || !inputText.trim()}
+                  disabled={isTranslating || !inputText.trim() || (retryCountdown !== null && retryCountdown > 0)}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: '8px',
-                    backgroundColor: isTranslating || !inputText.trim() ? '#1e293b' : '#38bdf8',
-                    color: isTranslating || !inputText.trim() ? '#64748b' : '#0a0f1d',
+                    backgroundColor: isTranslating || !inputText.trim() || (retryCountdown !== null && retryCountdown > 0) ? '#1e293b' : '#38bdf8',
+                    color: isTranslating || !inputText.trim() || (retryCountdown !== null && retryCountdown > 0) ? '#64748b' : '#0a0f1d',
                     border: 'none',
                     padding: '8px 16px',
                     borderRadius: '8px',
                     fontWeight: 700,
                     fontSize: '0.88rem',
-                    cursor: isTranslating || !inputText.trim() ? 'not-allowed' : 'pointer',
+                    cursor: isTranslating || !inputText.trim() || (retryCountdown !== null && retryCountdown > 0) ? 'not-allowed' : 'pointer',
                     transition: 'all 0.2s ease'
                   }}
                 >
                   <SparklesIcon size={16} />
-                  <span>{isTranslating ? 'Translating with Gemini...' : 'Translate with Gemini AI'}</span>
+                  <span>
+                    {isTranslating
+                      ? 'Translating with Gemini...'
+                      : retryCountdown !== null && retryCountdown > 0
+                      ? `Rate Limited (Wait ${retryCountdown}s)`
+                      : 'Translate with Gemini AI'}
+                  </span>
                 </button>
               </div>
             </div>
@@ -744,7 +773,15 @@ export const ClassroomConsole: React.FC = () => {
                       marginBottom: '6px'
                     }}>
                       <AlertCircleIcon size={18} />
-                      <span>{aiErrorCode === 'MISSING_API_KEY' ? 'Gemini API Key Required' : 'Translation Request Notice'}</span>
+                      <span>
+                        {aiErrorCode === 'MISSING_API_KEY'
+                          ? 'Gemini API Key Required'
+                          : aiQuotaType === 'daily'
+                          ? 'Daily Gemini API Quota Exhausted'
+                          : aiErrorCode === 'QUOTA_EXCEEDED'
+                          ? 'Gemini API Rate Limit Reached'
+                          : 'Translation Request Notice'}
+                      </span>
                     </div>
                     <p style={{ fontSize: '0.84rem', color: '#cbd5e1', lineHeight: 1.5, marginBottom: '8px' }}>
                       {aiError}
@@ -763,22 +800,40 @@ export const ClassroomConsole: React.FC = () => {
                       </div>
                     )}
                     {aiErrorCode !== 'MISSING_API_KEY' && (
-                      <button
-                        onClick={handleManualTranslate}
-                        style={{
-                          backgroundColor: '#38bdf8',
-                          color: '#0a0f1d',
-                          border: 'none',
-                          padding: '6px 12px',
+                      aiQuotaType === 'daily' ? (
+                        <div style={{
+                          marginTop: '8px',
+                          padding: '8px 10px',
+                          backgroundColor: 'rgba(15, 23, 42, 0.6)',
                           borderRadius: '6px',
-                          fontSize: '0.8rem',
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          marginTop: '6px'
-                        }}
-                      >
-                        Retry Translation
-                      </button>
+                          fontSize: '0.78rem',
+                          color: '#94a3b8',
+                          lineHeight: 1.4
+                        }}>
+                          💡 <strong>How to resolve:</strong> Check your project plan at <a href="https://ai.dev/rate-limit" target="_blank" rel="noopener noreferrer" style={{ color: '#38bdf8' }}>Google AI Studio Quota Monitor</a>. The free tier for this model resets at midnight Pacific Time. To expand capacity, configure an API key from an independent Google Cloud project.
+                        </div>
+                      ) : (
+                        <button
+                          onClick={handleManualTranslate}
+                          disabled={isTranslating || (retryCountdown !== null && retryCountdown > 0)}
+                          style={{
+                            backgroundColor: (retryCountdown !== null && retryCountdown > 0) || isTranslating ? '#1e293b' : '#38bdf8',
+                            color: (retryCountdown !== null && retryCountdown > 0) || isTranslating ? '#64748b' : '#0a0f1d',
+                            border: 'none',
+                            padding: '6px 14px',
+                            borderRadius: '6px',
+                            fontSize: '0.8rem',
+                            fontWeight: 700,
+                            cursor: (retryCountdown !== null && retryCountdown > 0) || isTranslating ? 'not-allowed' : 'pointer',
+                            marginTop: '6px',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          {retryCountdown !== null && retryCountdown > 0
+                            ? `Retry Available in ${retryCountdown}s`
+                            : 'Retry Translation'}
+                        </button>
+                      )
                     )}
                   </div>
                 ) : aiResult ? (

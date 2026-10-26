@@ -2,21 +2,36 @@ import { defineConfig, Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import dotenv from 'dotenv';
 import { translateWithGemini } from './src/server/translateService';
+import { geminiKeyManager } from './src/server/geminiKeyManager';
+import { requestQueue } from './src/server/requestQueue';
 
 dotenv.config();
 
 function bhashaSetuApiPlugin(): Plugin {
   const setupApiMiddleware = (server: any) => {
     server.middlewares.use(async (req: any, res: any, next: any) => {
-      // Health check and API key readiness endpoint
+      // Server diagnostics and failover health endpoints
+      if ((req.url === '/health' || req.url === '/api/health') && req.method === 'GET') {
+        const diag = geminiKeyManager.getDiagnostics();
+        const queueStats = requestQueue.getStats();
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.statusCode = diag.status === 'unhealthy' ? 503 : 200;
+        res.end(JSON.stringify({ ...diag, queue: queueStats }, null, 2));
+        return;
+      }
+
+      // Quick API status endpoint
       if (req.url === '/api/status' && req.method === 'GET') {
-        const hasKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 0);
-        res.setHeader('Content-Type', 'application/json');
+        const diag = geminiKeyManager.getDiagnostics();
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
         res.statusCode = 200;
         res.end(JSON.stringify({
-          status: 'online',
-          hasApiKey: hasKey,
-          model: 'gemini-3.8-flash'
+          status: diag.status,
+          hasApiKey: diag.keys.total > 0,
+          activeKeys: diag.keys.active,
+          totalKeys: diag.keys.total,
+          model: 'gemini-3.8-flash',
+          supportedModels: diag.supportedModels
         }));
         return;
       }
@@ -37,7 +52,11 @@ function bhashaSetuApiPlugin(): Plugin {
             });
 
             res.setHeader('Content-Type', 'application/json; charset=utf-8');
-            res.statusCode = result.success ? 200 : (result.errorCode === 'MISSING_API_KEY' ? 400 : (result.errorCode === 'QUOTA_EXCEEDED' ? 429 : 500));
+            res.statusCode = result.success
+              ? 200
+              : (result.errorCode === 'MISSING_API_KEY'
+                  ? 400
+                  : (result.errorCode === 'QUOTA_EXCEEDED' ? 429 : 500));
             res.end(JSON.stringify(result));
           } catch (err: any) {
             res.setHeader('Content-Type', 'application/json; charset=utf-8');
